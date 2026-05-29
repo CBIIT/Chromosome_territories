@@ -1,0 +1,257 @@
+# napari P/Q Arm Analyzer
+
+![P/Q Arm Analyzer UI](docs/images/plugin_screenshot.png)
+
+Interactive napari plugin for nuclei segmentation, P/Q-arm detection, batch scene analysis, mask export, CSV measurement export, and summary plot generation in 3D microscopy images.
+
+**Author and repository owner**  
+Adib Keikhosravi, Ph.D.  
+Staff Scientist, Laboratory of Receptor Biology and Gene Expression, CCR, NCI  
+National Institutes of Health  
+Email: adib.keikhosravi@nih.gov
+
+**License:** MIT License. See [`LICENSE`](LICENSE).
+
+## Version
+
+Current repository version: **0.3.4**
+
+This version is streamlined for routine use. It keeps only three P/Q arm detection methods:
+
+```text
+Legacy 1D GMM
+Upgraded 1D GMM + gate + scoring
+MRF/CRF refinement
+```
+
+It also includes:
+
+- configuration save/load as JSON;
+- scene checkboxes for batch analysis;
+- cleaned napari visualization panel;
+- detailed hover/click help buttons for all visible parameters;
+- 3D shape and radial-position measurements;
+- a simplified public CSV output table with internal tuning/debug columns removed;
+- multi-format image loading for common microscopy formats.
+
+The previous experimental P/Q arm methods and their GUI controls are not shown in this version. The P arm probability preview, Q arm probability preview, and binary nuclei mask preview layers are not added to the napari layer panel.
+
+## Full manual
+
+The detailed user manual is included in:
+
+```text
+docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.4.docx
+```
+
+The manual explains the workflow, every visible parameter, tuning recommendations, output files, remaining result columns, and an appendix on MRF/CRF refinement and component selection.
+
+## Repository screenshot
+
+The README image link points to:
+
+```text
+docs/images/plugin_screenshot.png
+```
+
+Replace that file with a screenshot exported from the napari plugin when you want the GitHub main page to show your final plugin image.
+
+## Installation
+
+Install inside the same conda or Python environment used to run napari:
+
+```bash
+python -m pip uninstall -y napari-pq-arm-analyzer
+python -m pip install -e .
+napari
+```
+
+Open the widget from:
+
+```text
+Plugins > P/Q Arm Analyzer > P/Q Arm Analyzer
+```
+
+Optional fallback readers can be installed if your environment needs extra support for LIF, ND2, or IMS files:
+
+```bash
+python -m pip install readlif nd2reader imaris-ims-file-reader
+```
+
+## Supported image formats
+
+The plugin uses AICSImageIO first when possible, with fallback readers for common file types. Supported paths include:
+
+```text
+.lif
+.czi
+.nd2
+.ims
+.ome.tif / .ome.tiff
+.tif / .tiff
+.lsm
+.zarr
+```
+
+Files with multiple scenes, series, fields, or tiles are exposed as selectable scenes. You can load one scene for interactive preview and check multiple scenes for batch analysis.
+
+## Quick workflow
+
+1. Launch napari and open the plugin.
+2. Click **Load image...**.
+3. Select a preview scene and click **Load selected scene for preview**.
+4. Set the nucleus, P-arm, and Q-arm channel numbers.
+5. Tune nuclei segmentation and click **Preview nuclei masks**.
+6. Choose one of the three P/Q arm detection methods.
+7. Tune arm-detection parameters and click **Preview P/Q arm masks**.
+8. Choose an output folder.
+9. Optionally save the current configuration.
+10. Optionally check multiple scenes for batch analysis.
+11. Click **Analyze and save all outputs**.
+
+## Configuration files
+
+The GUI provides:
+
+```text
+Save configuration...
+Load configuration...
+```
+
+A configuration JSON stores current parameter values, UI options, output folder, image path, preview scene, and checked scene indices. Every analysis result folder also receives:
+
+```text
+pq_arm_analyzer_configuration.json
+analysis_parameters.json
+```
+
+Batch analysis additionally saves:
+
+```text
+batch_pq_arm_analyzer_configuration.json
+```
+
+## Visible P/Q arm detection methods
+
+### Legacy 1D GMM
+
+Intensity-only baseline. A Gaussian mixture model is fitted inside each nucleus, classes are sorted from dimmest to brightest, and selected bright classes are used as the arm mask. This is useful for very clean images but can segment noise when no true P/Q signal is present.
+
+### Upgraded 1D GMM + gate + scoring
+
+Recommended starting method. It adds field-level intensity normalization, a presence/absence gate, probability thresholding, and connected-component scoring. This helps prevent false-positive P/Q masks in nuclei where the channel contains only noise.
+
+### MRF/CRF refinement
+
+Boundary-refinement method. It starts from the upgraded GMM probability map and encourages neighboring voxels to agree while respecting image edges. It is useful when the upgraded method finds the correct general region but the boundary is ragged, speckled, or has small holes.
+
+## GUI simplification in v0.3.4
+
+Several advanced internal controls were removed from the GUI and fixed at conservative backend defaults. This keeps the interface focused on parameters that usually need user tuning: channels, nuclei size/downsampling, scene batching, GMM class selection, field normalization, presence gate thresholds, probability thresholding, component selection, and MRF/CRF boundary refinement.
+
+The fixed backend defaults are still recorded in the configuration and parameter JSON files for reproducibility.
+
+## Napari layers shown
+
+Raw scene layers:
+
+```text
+Nucleus channel
+P arm channel
+Q arm channel
+```
+
+Preview/result layers:
+
+```text
+Nuclei labels preview
+P arm mask preview
+Q arm mask preview
+P/Q overlap preview
+```
+
+The P, Q, and overlap masks are Image layers, so colormap/color changes should behave like raw image channels. The nuclei layer remains a Labels layer because it stores object identities.
+
+## Main output files
+
+A single-scene analysis writes:
+
+```text
+nuclei_labels_3d.tif
+p_arm_mask_3d.tif
+q_arm_mask_3d.tif
+pq_overlap_mask_3d.tif
+p_arm_probability_3d.tif                 # if Save probability maps is enabled
+q_arm_probability_3d.tif                 # if Save probability maps is enabled
+p_arm_labels_by_nucleus_3d.tif           # if Save arm label masks is enabled
+q_arm_labels_by_nucleus_3d.tif           # if Save arm label masks is enabled
+pq_overlap_labels_by_nucleus_3d.tif      # if Save arm label masks is enabled
+series7_chrX_arm_measurements_per_nucleus.csv
+series7_chrX_arm_measurements_population_summary.csv
+analysis_parameters.json
+pq_arm_analyzer_configuration.json
+arm_intensity_context.json
+qc_nuc_maxproj.tif                       # if Save QC max projections is enabled
+qc_p_maxproj.tif                         # if Save QC max projections is enabled
+qc_q_maxproj.tif                         # if Save QC max projections is enabled
+qc_nuclei_labels_maxproj.tif             # if Save QC max projections is enabled
+plots/*.png
+plots/plot_summary.txt
+```
+
+## Public result table
+
+The public per-nucleus CSV keeps the most useful biological/image-analysis measurements: volumes, volume fractions, overlap, contact, minimum edge distance, centroids, shape metrics, and continuous 3D radial-position metrics.
+
+Internal tuning/debug columns are intentionally omitted from the public CSV. Removed columns include field-background medians/MADs, presence-gate diagnostics, BIC/LLR diagnostics, GMM means, component diagnostic scores, selected bounding-box dimensions, selected distance-transform raw values, and the requested shell-1 fraction columns.
+
+See the manual for a detailed explanation of every remaining column.
+
+## Plots
+
+The plot set includes summary figures for arm volume fraction, P/Q overlap, contact frequency, minimum edge distance, P versus Q volume, mean arm volume versus overlap, centroid separation, radial centroid position, and shape/sphericity summaries when the required columns are present.
+
+Plots associated only with removed diagnostic columns are not generated in this version.
+
+## Recommended starting settings for large 57-slice images
+
+```text
+Nuclei segmentation mode: Cellpose 2D stack batch + overlap stitch
+XY downsample factor: 2.0
+2D batch size: 8
+Worker count: 0
+Backend: threading
+Preview nucleus limit: 10 to 25
+Arm method: Upgraded 1D GMM + gate + scoring
+Max GMM components: 2
+P/Q sorted class index: 1
+Probability threshold: 0.50
+Binary morphology: off
+```
+
+After the preview looks good, set **Analysis nucleus limit** to 0 and run the full analysis.
+
+## Development notes
+
+This repository is structured as a standard editable Python package:
+
+```text
+src/napari_pq_arm_analyzer/
+    _widget.py       # napari GUI and parameter handling
+    analysis.py      # nuclei segmentation, arm detection, measurements, outputs
+    image_io.py      # image/scene loading
+    plotting.py      # summary plot generation
+    napari.yaml      # napari plugin manifest
+examples/
+    launch_widget.py
+
+docs/manual/
+    PQ_Arm_Analyzer_User_Manual_v0.3.4.docx
+
+docs/images/
+    plugin_screenshot.png
+```
+
+## Citation and attribution
+
+The repository author/owner information appears at the top of each Python file and at the beginning of the manual. The repository is distributed under the MIT License.

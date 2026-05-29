@@ -1,0 +1,11 @@
+name: napari-pq-arm-analyzer
+display_name: P/Q Arm Analyzer
+schema_version: 0.2.1
+contributions:
+  commands:
+    - id: napari-pq-arm-analyzer.make_widget
+      title: Open P/Q Arm Analyzer
+      python_name: napari_pq_arm_analyzer._widget:make_widget
+  widgets:
+    - command: napari-pq-arm-analyzer.make_widget
+      display_name: P/Q Arm Analyzer

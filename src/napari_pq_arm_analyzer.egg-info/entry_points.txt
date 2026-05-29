@@ -1,0 +1,2 @@
+[napari.manifest]
+napari-pq-arm-analyzer = napari_pq_arm_analyzer:napari.yaml
