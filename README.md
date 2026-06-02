@@ -1,8 +1,14 @@
-# napari P/Q Arm Analyzer
+# Chromosome Territories: P/Q Arm Analyzer napari plugin
 
 ![P/Q Arm Analyzer UI](docs/images/plugin_screenshot.png)
 
-Interactive napari plugin for 3D nuclei segmentation, P/Q-arm detection, batch scene analysis, mask export, CSV measurement export, and summary plot generation from multi-channel microscopy images.
+Interactive napari plugin for 3D nuclei segmentation, chromosome-territory P/Q arm detection, batch scene analysis, mask export, CSV measurement export, and summary plot generation from multi-channel microscopy images.
+
+**GitHub repository**
+
+```text
+https://github.com/CBIIT/Chromosome_territories.git
+```
 
 **Author and repository owner**  
 Adib Keikhosravi, Ph.D.  
@@ -26,7 +32,47 @@ Upgraded 1D GMM + gate + scoring
 MRF/CRF refinement
 ```
 
-It also includes scene checkboxes for batch analysis, configuration save/load, simplified napari visualization layers, detailed parameter help buttons, expanded 3D shape/radial measurements, and a public result table with internal tuning/debug columns removed.
+It also includes:
+
+- scene checkboxes for batch analysis;
+- configuration save/load as JSON;
+- simplified napari visualization layers;
+- detailed parameter help buttons;
+- expanded 3D shape/radial measurements;
+- a public result table with internal tuning/debug columns removed;
+- multi-format image loading for common microscopy formats.
+
+---
+
+## Repository name versus Python package name
+
+The **GitHub repository** is named:
+
+```text
+Chromosome_territories
+```
+
+The current **Python package/distribution name** in `pyproject.toml` is:
+
+```text
+napari-pq-arm-analyzer
+```
+
+That means installation/uninstallation commands may still use `napari-pq-arm-analyzer`, while Git commands and directory paths use `Chromosome_territories`.
+
+For example:
+
+```bash
+git clone https://github.com/CBIIT/Chromosome_territories.git
+cd Chromosome_territories
+python -m pip install -e .
+```
+
+To remove a previously installed editable version:
+
+```bash
+python -m pip uninstall -y napari-pq-arm-analyzer
+```
 
 ---
 
@@ -73,9 +119,9 @@ The plugin provides an interactive workflow in napari:
 
 # Installation
 
-This section gives a complete installation path starting from a clean machine or clean conda environment.
+This section gives complete installation steps starting from a clean machine or a clean conda environment.
 
-The plugin is a napari plugin, so it should be installed into the same Python environment that will launch napari.
+The plugin is a napari plugin, so it should be installed into the **same Python environment that will launch napari**.
 
 ## 1. Install prerequisites
 
@@ -90,21 +136,38 @@ A working graphical desktop session for napari
 
 Recommended: use a fresh conda environment rather than installing into an existing analysis environment.
 
-### Install Miniconda or Anaconda
+### 1.1 Check Git
 
-Install Miniconda or Anaconda if you do not already have conda available. After installation, open a new terminal and confirm:
+```bash
+git --version
+```
+
+If Git is missing, install it with your system package manager or from the official Git installer.
+
+On Ubuntu/Debian systems:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git
+```
+
+### 1.2 Check conda
 
 ```bash
 conda --version
 ```
 
-If you prefer mamba, install it into your base conda environment:
+If conda is not installed, install Miniconda or Anaconda. After installation, open a new terminal and run the command again.
+
+### 1.3 Optional: install mamba
+
+Mamba is optional but often solves conda environments faster:
 
 ```bash
 conda install -n base -c conda-forge mamba -y
 ```
 
-All commands below use `conda`, but you can replace `conda` with `mamba` for faster solving.
+All commands below use `conda`. You can replace `conda` with `mamba` if preferred.
 
 ---
 
@@ -113,17 +176,17 @@ All commands below use `conda`, but you can replace `conda` with `mamba` for fas
 Recommended environment name:
 
 ```text
-pq-arm-analyzer
+chromosome-territories
 ```
 
-Create and activate it:
+Create and activate the environment:
 
 ```bash
-conda create -n pq-arm-analyzer python=3.9 -y
-conda activate pq-arm-analyzer
+conda create -n chromosome-territories python=3.9 -y
+conda activate chromosome-territories
 ```
 
-Upgrade the basic Python build tools:
+Upgrade basic Python build tools:
 
 ```bash
 python -m pip install --upgrade pip setuptools wheel
@@ -134,6 +197,13 @@ Confirm that the terminal is using the environment you just created:
 ```bash
 python --version
 python -m pip --version
+which python
+```
+
+On Windows, use:
+
+```bash
+where python
 ```
 
 ---
@@ -152,7 +222,7 @@ If that command fails on your system, try installing napari and PyQt separately:
 python -m pip install napari pyqt5
 ```
 
-You can verify napari launches before installing the plugin:
+Verify that napari launches before installing the plugin:
 
 ```bash
 napari
@@ -160,19 +230,38 @@ napari
 
 Close napari after confirming that the main window opens.
 
+### Linux note for Qt/napari
+
+If napari fails to open on Linux because Qt libraries are missing, install common desktop dependencies. On Ubuntu/Debian systems, this may help:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libxcb-xinerama0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxkbcommon-x11-0
+```
+
+Then try:
+
+```bash
+napari
+```
+
 ---
 
 ## 4. Decide whether you need CPU or GPU Cellpose
 
 The plugin uses Cellpose for nuclei segmentation. Cellpose uses PyTorch internally.
 
-### CPU-only installation
+### 4.1 CPU-only installation
 
 For CPU-only use, no special GPU setup is required. Installing the plugin will install Cellpose and its Python dependencies.
 
-### GPU installation
+This is the simplest installation path and is recommended for first-time testing.
 
-For GPU acceleration, install a PyTorch build compatible with your NVIDIA driver and CUDA setup before installing the plugin. The exact PyTorch command depends on your workstation and CUDA version. After installing the GPU-enabled PyTorch build, confirm:
+### 4.2 GPU installation
+
+For GPU acceleration, install a PyTorch build compatible with your NVIDIA driver and CUDA setup before installing the plugin. The exact PyTorch command depends on your workstation and CUDA version.
+
+After installing a GPU-enabled PyTorch build, confirm:
 
 ```bash
 python -c "import torch; print('CUDA available:', torch.cuda.is_available()); print('torch:', torch.__version__)"
@@ -190,32 +279,34 @@ If CUDA is not available, the plugin can still run with CPU Cellpose, but nuclei
 
 ## 5. Clone the repository from GitHub
 
-After this repository has been uploaded to GitHub, clone it with:
+Clone the repository from the CBIIT GitHub organization:
 
 ```bash
-git clone https://github.com/<YOUR_GITHUB_USERNAME>/napari-pq-arm-analyzer.git
-cd napari-pq-arm-analyzer
+git clone https://github.com/CBIIT/Chromosome_territories.git
+cd Chromosome_territories
 ```
 
-Replace `<YOUR_GITHUB_USERNAME>` with the GitHub account or organization name that owns the repository.
+If the repository is private, make sure you are logged in with GitHub credentials or have configured SSH access.
 
-For example:
+### Alternative SSH clone
+
+If your GitHub account is configured for SSH access:
 
 ```bash
-git clone https://github.com/adib-keikhosravi/napari-pq-arm-analyzer.git
-cd napari-pq-arm-analyzer
+git clone git@github.com:CBIIT/Chromosome_territories.git
+cd Chromosome_territories
 ```
-
-If your repository is private, make sure you are logged in with GitHub credentials or have configured SSH access.
 
 ### Alternative: install from a downloaded ZIP
 
-If you have a ZIP file instead of a GitHub clone:
+If you downloaded the repository ZIP from GitHub:
 
 ```bash
-unzip napari_pq_arm_analyzer_repository_v0_3_5.zip
-cd napari-pq-arm-analyzer
+unzip Chromosome_territories-main.zip
+cd Chromosome_territories-main
 ```
+
+If your ZIP extracts to a different folder name, `cd` into that extracted repository folder.
 
 ---
 
@@ -239,7 +330,7 @@ For broader microscopy file support, install optional reader packages:
 python -m pip install -e ".[extra-readers]"
 ```
 
-This installs optional support packages for formats such as LIF, ND2, and IMS when available:
+This optional group installs support packages for LIF, ND2, and IMS fallback loading when available:
 
 ```text
 readlif
@@ -265,110 +356,83 @@ python -m pip install imaris-ims-file-reader
 
 ## 7. Verify the installation
 
-From the same activated conda environment, run:
+Confirm that the package can be imported:
 
 ```bash
 python -c "import napari_pq_arm_analyzer; print(napari_pq_arm_analyzer.__version__)"
 ```
 
-Then start napari:
+Confirm that napari sees the plugin:
 
 ```bash
 napari
 ```
 
-Open the plugin from the napari menu:
+Then open the widget from the napari menu:
 
 ```text
 Plugins > P/Q Arm Analyzer > P/Q Arm Analyzer
 ```
 
-If the plugin appears in the menu, the installation was successful.
-
----
-
-## 8. Test with a small image or one scene first
-
-Before running a large batch:
-
-1. Open napari.
-2. Open the plugin.
-3. Click **Load image...**.
-4. Select a file.
-5. Load one scene for preview.
-6. Select the nucleus, P-arm, and Q-arm channels.
-7. Run **Preview nuclei masks**.
-8. Run **Preview P/Q arm masks**.
-9. Save outputs to a test folder.
-
-After this test works, use the scene checkboxes for batch analysis.
-
----
-
-## 9. Updating the plugin later
-
-If the repository was installed from GitHub:
+If the plugin does not appear, try closing napari and running:
 
 ```bash
-conda activate pq-arm-analyzer
-cd napari-pq-arm-analyzer
+python -m pip install -e . --force-reinstall
+napari
+```
+
+---
+
+## 8. Clean reinstall or update
+
+Use this when switching branches, updating the repository, or replacing an older plugin version.
+
+From inside the repository:
+
+```bash
+conda activate chromosome-territories
+cd Chromosome_territories
+
 git pull
-python -m pip install -e .
-```
-
-If optional readers are used:
-
-```bash
-python -m pip install -e ".[extra-readers]"
-```
-
-Restart napari after updating.
-
----
-
-## 10. Clean reinstall
-
-If napari is showing an old plugin version or the plugin menu is inconsistent, reinstall cleanly:
-
-```bash
-conda activate pq-arm-analyzer
 python -m pip uninstall -y napari-pq-arm-analyzer
-cd napari-pq-arm-analyzer
 python -m pip install -e .
 napari
 ```
 
-For optional readers:
+If you installed from a ZIP instead of GitHub, download the newer ZIP, extract it, and run:
 
 ```bash
-python -m pip install -e ".[extra-readers]"
+conda activate chromosome-territories
+cd Chromosome_territories-main
+
+python -m pip uninstall -y napari-pq-arm-analyzer
+python -m pip install -e .
+napari
 ```
 
 ---
 
-## 11. Creating the GitHub repository from the ZIP file
+## 9. Uninstall
 
-If you received the repository as a ZIP file and want to upload it to GitHub:
+To remove the plugin from the active environment:
 
 ```bash
-unzip napari_pq_arm_analyzer_repository_v0_3_5.zip
-cd napari-pq-arm-analyzer
-
-git init
-git add .
-git commit -m "Initial commit: napari P/Q Arm Analyzer"
-git branch -M main
-git remote add origin https://github.com/<YOUR_GITHUB_USERNAME>/napari-pq-arm-analyzer.git
-git push -u origin main
+conda activate chromosome-territories
+python -m pip uninstall -y napari-pq-arm-analyzer
 ```
 
-After pushing to GitHub, users can install with the clone workflow above.
+To remove the whole conda environment:
+
+```bash
+conda deactivate
+conda remove -n chromosome-territories --all -y
+```
 
 ---
 
 # Supported image formats
 
-The plugin uses AICSImageIO first when possible and includes fallback reader logic for common microscopy formats. Supported paths include:
+The plugin uses AICSImageIO first when possible, with fallback readers for common file types. Supported paths include:
 
 ```text
 .lif
@@ -381,9 +445,9 @@ The plugin uses AICSImageIO first when possible and includes fallback reader log
 .zarr
 ```
 
-Files with multiple scenes, fields, series, positions, or tiles are exposed in the scene dropdown and the scene checkbox list. You can load one scene for interactive preview and check multiple scenes for batch analysis.
+Files with multiple scenes, series, fields, positions, or tiles are exposed as selectable scenes. You can load one scene for interactive preview and check multiple scenes for batch analysis.
 
-Optional reader packages may be required for some files:
+Optional reader packages improve support for some file types:
 
 ```bash
 python -m pip install readlif nd2reader imaris-ims-file-reader
@@ -391,119 +455,117 @@ python -m pip install readlif nd2reader imaris-ims-file-reader
 
 ---
 
-# Repository layout
+# Quick workflow
 
-```text
-napari-pq-arm-analyzer/
-  README.md
-  LICENSE
-  CHANGELOG.md
-  pyproject.toml
-  MANIFEST.in
-  src/napari_pq_arm_analyzer/
-    __init__.py
-    _widget.py
-    analysis.py
-    help_text.py
-    image_io.py
-    plotting.py
-    napari.yaml
-  docs/manual/
-    PQ_Arm_Analyzer_User_Manual_v0.3.5.docx
-  docs/images/
-    plugin_screenshot.png
-  examples/
-    launch_widget.py
-```
+1. Launch napari and open the plugin.
+2. Click **Load image...**.
+3. Select a preview scene and click **Load selected scene for preview**.
+4. Set the nucleus, P-arm, and Q-arm channel numbers.
+5. Tune nuclei segmentation and click **Preview nuclei masks**.
+6. Choose one of the three P/Q arm detection methods.
+7. Tune arm-detection parameters and click **Preview P/Q arm masks**.
+8. Choose an output folder.
+9. Optionally save the current configuration.
+10. Optionally check multiple scenes for batch analysis.
+11. Click **Analyze and save all outputs**.
 
 ---
 
-# GUI layers shown in napari
+# Configuration files
 
-This version intentionally keeps the layer panel simple. It does **not** add P-arm probability preview, Q-arm probability preview, or Nuclei mask preview layers.
-
-Shown layers are:
-
-```text
-Nucleus channel
-P arm channel
-Q arm channel
-Nuclei labels preview
-P arm mask preview
-Q arm mask preview
-P/Q overlap preview
-```
-
-The P, Q, and overlap masks are shown as napari Image layers, so colormap changes behave like raw channel color changes. The nuclei preview remains a Labels layer because it stores object identities.
-
----
-
-# Configuration save/load
-
-The GUI includes:
+The GUI provides:
 
 ```text
 Save configuration...
 Load configuration...
 ```
 
-A configuration JSON stores visible parameter values, output folder, image path, selected preview scene, checked batch scenes, and useful UI options.
+A configuration JSON stores current parameter values, UI options, output folder, image path, preview scene, and checked scene indices.
 
-Every final analysis folder receives:
+Every analysis result folder also receives:
 
 ```text
 pq_arm_analyzer_configuration.json
 analysis_parameters.json
 ```
 
-Batch analysis also writes:
+Batch analysis additionally saves:
 
 ```text
 batch_pq_arm_analyzer_configuration.json
 ```
 
-Use configuration files to reuse the same parameters across future images or to document exactly how a result folder was generated.
+Recommended practice:
+
+- Save a configuration after tuning on a representative scene.
+- Reuse that configuration for batch analysis of related scenes.
+- Keep the saved configuration with the exported masks and CSV files for reproducibility.
 
 ---
 
-# Arm-detection methods
+# Visible P/Q arm detection methods
 
 ## Legacy 1D GMM
 
-Baseline intensity-only method. It fits Gaussian intensity classes inside each nucleus and keeps selected bright classes. It is useful for comparison and very clean images, but it can segment noise because it always tries to split intensities into classes.
+Intensity-only baseline. A Gaussian mixture model is fitted inside each nucleus, classes are sorted from dimmest to brightest, and selected bright classes are used as the arm mask.
+
+Use it when the P/Q signal is clean and bright. Avoid relying on it when nuclei may contain no true P/Q signal, because an intensity-only GMM can still divide noise into dim and bright classes.
 
 ## Upgraded 1D GMM + gate + scoring
 
-Recommended default. It adds field-level robust normalization, an explicit presence/absence gate, probability thresholding, and connected-component scoring. This is usually the best starting method when some nuclei may have weak signal or no convincing P/Q signal.
+Recommended starting method. It adds field-level intensity normalization, a presence/absence gate, probability thresholding, and connected-component scoring.
+
+This helps prevent false-positive P/Q masks in nuclei where the arm channel contains only background or noise.
 
 ## MRF/CRF refinement
 
-Starts from the upgraded GMM probability map and adds spatial refinement. Neighboring voxels are encouraged to agree, but strong intensity edges reduce smoothing across boundaries. Use this when the upgraded method finds the correct general region but boundaries are ragged, speckled, or have small holes.
+Boundary-refinement method. It starts from the upgraded GMM probability map and encourages neighboring voxels to agree while respecting image edges.
+
+Use it when the upgraded method finds the correct general region but the boundary is ragged, speckled, fragmented, or has small holes.
 
 ---
 
-# Quick-start settings for a new image set
+# GUI simplification in v0.3.5
 
-A practical starting point for large multi-slice images is:
+Several advanced internal controls were removed from the GUI and fixed at conservative backend defaults. This keeps the interface focused on parameters that usually need user tuning:
 
 ```text
-Nuclei segmentation mode: Cellpose 2D stack batch + overlap stitch
-XY downsample factor: 2.0 for preview, lower if boundaries need more precision
-2D batch size: 8, reduce if memory is limited
-Worker count: 0 or a moderate number
-Backend: threading
-Preview nucleus limit: a modest number while tuning
-Arm method: Upgraded 1D GMM + gate + scoring
-Max GMM components: 2
-P/Q sorted class index: 1
-Normalization mode: mixed_outside_or_low_percentile
-Presence gate: enabled
-Probability threshold: 0.50
-Component selection: best_score
-Binary morphology: off
+channels
+nuclei model and size/downsampling
+scene batching
+GMM class selection
+field normalization
+presence-gate thresholds
+probability thresholding
+component selection
+MRF/CRF boundary refinement
+measurement/output options
 ```
 
-After the preview looks good, set **Analysis nucleus limit** to 0 for the final run.
+The fixed backend defaults are still recorded in the configuration and parameter JSON files for reproducibility.
+
+---
+
+# Napari layers shown
+
+Raw scene layers:
+
+```text
+Nucleus channel
+P arm channel
+Q arm channel
+```
+
+Preview/result layers:
+
+```text
+Nuclei labels preview
+P arm mask preview
+Q arm mask preview
+P/Q overlap preview
+```
+
+The P, Q, and overlap masks are Image layers, so colormap/color changes should behave like raw image channels. The nuclei layer remains a Labels layer because it stores object identities.
 
 ---
 
@@ -534,190 +596,123 @@ plots/*.png
 plots/plot_summary.txt
 ```
 
-Batch analysis writes one result folder per checked scene, plus a batch configuration file in the base output folder.
+For batch analysis, each checked scene is saved into its own scene-specific output folder, and the batch-level configuration file is saved in the selected output root folder.
 
 ---
 
 # Public result table
 
-The public per-nucleus CSV keeps final analysis/reporting columns such as:
+The public per-nucleus CSV keeps the most useful image-analysis measurements:
 
-- nucleus ID and method name;
-- nucleus, P, Q, and overlap volumes;
-- P and Q fractions of nuclear volume;
-- P/Q overlap normalized to P and Q;
-- P/Q contact and edge distance;
-- P and Q centroids;
-- selected radial-shell fractions;
-- 3D shape metrics such as surface area, sphericity, compactness, equivalent sphere diameter, PCA axis lengths, elongation, and flatness;
-- continuous 3D radial coordinates for P, Q, and P/Q overlap.
+```text
+nucleus identifiers
+nucleus volume
+P and Q arm volumes
+P and Q volume fractions
+P/Q overlap volume
+P/Q overlap normalized to P and Q
+P/Q contact
+minimum P/Q edge-to-edge distance
+P and Q centroids
+3D radial-position measurements
+3D shape measurements
+```
 
-Internal tuning/debug columns are intentionally omitted from the public CSV. These include field-background medians/MADs, GMM means, BIC/LLR diagnostics, presence-gate diagnostics, detailed component diagnostics, selected bounding-box dimensions, selected raw distance-transform values, and the requested shell-1 fractions.
+Internal tuning/debug columns are intentionally omitted from the public CSV. Removed columns include field-background medians/MADs, presence-gate diagnostics, BIC/LLR diagnostics, GMM means, component diagnostic scores, selected bounding-box dimensions, selected raw distance-transform values, and the requested shell-1 fraction columns.
 
-See the manual for the complete result-column dictionary and formulas.
+See the manual for a detailed explanation of every remaining result column and how it is calculated.
 
 ---
 
 # Plots
 
-The plot set includes summary figures for arm volume fraction, P/Q overlap, contact frequency, minimum edge distance, P versus Q volume, mean arm volume versus overlap, centroid separation, radial centroid position, and shape/sphericity when the required columns are present.
-
-Plots based only on removed internal diagnostic columns are not generated.
-
----
-
-# Parameter help buttons
-
-Each visible parameter row has a round **i** help button.
-
-- Hovering over the button shows detailed help.
-- Clicking the button opens a fixed help window.
-- Re-clicking the same parameter help button raises the existing help window instead of opening duplicate windows.
-
-The help text is stored in:
+The plot set includes summary figures for:
 
 ```text
-src/napari_pq_arm_analyzer/help_text.py
+arm volume fraction
+P/Q overlap
+contact frequency
+minimum edge distance
+P versus Q volume
+mean arm volume versus overlap
+centroid separation
+radial centroid position
+shape/sphericity summaries when the required columns are present
 ```
+
+Plots associated only with removed diagnostic columns are not generated in this version.
 
 ---
 
-# Hidden backend defaults
+# Recommended starting settings for large 3D images
 
-To simplify routine use, the following advanced/internal parameters are not shown in the GUI and are fixed to conservative defaults internally:
+For initial tuning on large multi-slice images, start with settings that reduce computational cost while preserving the main object structure:
 
 ```text
-Foreground bbox XY pad
-Cellprob threshold
-Flow threshold
-3D stitch threshold
-Covariance type
-Random state
-Max voxels/nucleus for fitting
+Nuclei segmentation mode: Cellpose 2D stack batch + overlap stitch
+XY downsample factor: 2.0
+2D batch size: 8
+Worker count: 0
+Backend: threading
+Preview nucleus limit: 10 to 25
+Arm method: Upgraded 1D GMM + gate + scoring
+Max GMM components: 2
+P/Q sorted class index: 1
+Probability threshold: 0.50
+Binary morphology: off
 ```
 
-They remain recorded in JSON output files for reproducibility.
+After the preview looks good, set **Analysis nucleus limit** to 0 and run the full analysis.
 
 ---
 
-# Parameter tuning philosophy
-
-The most reliable way to tune the plugin is to treat segmentation as a sequence of decisions rather than one threshold.
-
-First tune nuclei, because all arm measurements are made inside nucleus labels. Next tune the GMM class index and probability threshold so the approximate P/Q signal region is correct. Then tune the presence gate so nuclei without convincing signal are rejected. Tune component selection after that, because it decides which connected 3D objects survive. Use MRF/CRF refinement only after the intensity-based result is mostly correct and the remaining problem is boundary quality, small gaps, or speckled edges.
-
-A typical tuning order is:
-
-```text
-1. Confirm scene and channel selection.
-2. Tune Cellpose nuclei segmentation.
-3. Tune GMM class index and probability threshold.
-4. Tune presence gate thresholds.
-5. Tune component selection mode and score threshold.
-6. Add MRF/CRF refinement if boundaries need spatial cleanup.
-7. Save configuration and run checked scenes.
-```
-
----
-
-# Result-column interpretation
-
-The per-nucleus CSV is designed to contain final analysis/reporting columns, not every internal diagnostic variable. For each nucleus, the table reports volumes, fractions, overlap, contact, edge distance, centroids, radial shell fractions, 3D shape metrics, PCA-based shape axes, continuous 3D radial positions, and method metadata.
-
-Important examples:
-
-- `p_fraction_of_nucleus` and `q_fraction_of_nucleus` normalize arm volume by nuclear volume.
-- `pq_overlap_fraction_of_p` and `pq_overlap_fraction_of_q` answer different questions when P and Q volumes differ.
-- `pq_contact` is a binary contact call, while `pq_min_edge_distance_um` is a continuous distance.
-- Shape columns such as sphericity and surface area help identify rough, fragmented, or over-smoothed masks.
-- Radial columns summarize where the P/Q masks lie inside each nucleus on a 0-to-1 center-to-periphery scale.
-
----
-
-# Visual validation checklist
-
-Before running a large batch, validate one or a few representative scenes:
-
-- Scroll through Z planes and confirm the correct scene and channels.
-- Check that nuclei are neither split nor merged.
-- Overlay P/Q masks on the raw channels.
-- Inspect strong-signal, weak-signal, and no-signal nuclei.
-- Confirm that saved masks and QC projections match the preview.
-- Review the saved configuration JSON alongside the CSV output.
-
----
-
-# Development and testing
-
-Useful checks from the repository root:
-
-```bash
-python -m compileall src
-python -m pip install -e .
-napari
-```
-
-The plugin is written as a standard napari npe2 plugin with the manifest in:
-
-```text
-src/napari_pq_arm_analyzer/napari.yaml
-```
-
----
-
-# Troubleshooting installation
+# Troubleshooting
 
 ## The plugin does not appear in napari
 
-Try:
+Make sure napari is launched from the same environment where the plugin was installed:
 
 ```bash
-conda activate pq-arm-analyzer
-python -m pip uninstall -y napari-pq-arm-analyzer
-cd napari-pq-arm-analyzer
-python -m pip install -e .
+conda activate chromosome-territories
+python -m pip show napari-pq-arm-analyzer
 napari
 ```
 
-Also confirm that you launched napari from the same environment where the plugin was installed:
+If needed, reinstall:
 
 ```bash
-which python
-which napari
-python -m pip show napari-pq-arm-analyzer
+python -m pip uninstall -y napari-pq-arm-analyzer
+python -m pip install -e .
 ```
 
-On Windows, use:
+## napari opens, but the plugin crashes when launched
 
-```bat
-where python
-where napari
-python -m pip show napari-pq-arm-analyzer
-```
-
-## napari opens but crashes with a Qt error
-
-Install or reinstall a Qt backend:
+Run napari from a terminal so that the full error message is visible:
 
 ```bash
-python -m pip install --upgrade "napari[pyqt5]" pyqt5
+conda activate chromosome-territories
+napari
 ```
 
-Then restart the terminal and relaunch napari.
+Then open:
 
-## LIF, ND2, or IMS files do not open
-
-Install optional readers:
-
-```bash
-python -m pip install readlif nd2reader imaris-ims-file-reader
+```text
+Plugins > P/Q Arm Analyzer > P/Q Arm Analyzer
 ```
 
-Then restart napari.
+Copy the terminal traceback if you need to report the issue.
 
 ## Cellpose is slow
 
-Use Cellpose 2D stack-batch mode, increase XY downsampling for preview, limit preview nuclei, and use GPU if available.
+Try:
+
+```text
+Use Cellpose 2D stack batch + overlap stitch
+Increase XY downsample factor for preview
+Use GPU if available
+Use a small Preview nucleus limit while tuning
+Disable live P/Q preview and click preview manually
+```
 
 ## GPU is not detected
 
@@ -727,42 +722,91 @@ Check PyTorch:
 python -c "import torch; print(torch.cuda.is_available()); print(torch.__version__)"
 ```
 
-If this prints `False`, install a GPU-enabled PyTorch build compatible with your system, then reinstall or restart napari.
+If this prints `False`, install a PyTorch build compatible with your NVIDIA driver/CUDA setup, or run Cellpose on CPU.
 
-## First Cellpose run is slow
+## Optional image formats do not open
 
-Cellpose may download or initialize model files the first time it runs. Later runs are usually faster after model files are cached.
+Install the optional readers:
+
+```bash
+python -m pip install readlif nd2reader imaris-ims-file-reader
+```
+
+Then restart napari.
+
+## Mask color does not change as expected
+
+The P arm, Q arm, and P/Q overlap previews are Image layers and should respond to colormap changes. The nuclei preview is a Labels layer and uses label-color behavior rather than image-colormap behavior.
 
 ---
 
-# Uninstalling
+# Development notes
 
-To remove the plugin from the current environment:
-
-```bash
-conda activate pq-arm-analyzer
-python -m pip uninstall -y napari-pq-arm-analyzer
-```
-
-To remove the entire environment:
-
-```bash
-conda deactivate
-conda env remove -n pq-arm-analyzer
-```
-
----
-
-# Attribution and license
-
-Author and repository owner:
+This repository is structured as a standard editable Python package:
 
 ```text
-Adib Keikhosravi, Ph.D.
-Staff Scientist,
-Laboratory of Receptor Biology and Gene Expression, CCR, NCI
-National Institutes of Health
-Email: adib.keikhosravi@nih.gov
+Chromosome_territories/
+    README.md
+    LICENSE
+    CHANGELOG.md
+    pyproject.toml
+    MANIFEST.in
+    src/napari_pq_arm_analyzer/
+        __init__.py
+        _widget.py       # napari GUI and parameter handling
+        analysis.py      # nuclei segmentation, arm detection, measurements, outputs
+        help_text.py     # GUI help text
+        image_io.py      # image/scene loading
+        plotting.py      # summary plot generation
+        napari.yaml      # napari plugin manifest
+    docs/manual/
+        PQ_Arm_Analyzer_User_Manual_v0.3.5.docx
+    docs/images/
+        plugin_screenshot.png
+    examples/
+        launch_widget.py
 ```
 
-This repository is protected by the MIT License. See [`LICENSE`](LICENSE).
+## Launching the widget during development
+
+After installing in editable mode:
+
+```bash
+conda activate chromosome-territories
+cd Chromosome_territories
+python -m pip install -e .
+napari
+```
+
+Or run the example script:
+
+```bash
+python examples/launch_widget.py
+```
+
+## Checking the package
+
+Basic import check:
+
+```bash
+python -c "import napari_pq_arm_analyzer; print('import ok')"
+```
+
+Editable install check:
+
+```bash
+python -m pip show napari-pq-arm-analyzer
+```
+
+---
+
+# Citation and attribution
+
+The repository author/owner information appears at the top of each Python file and at the beginning of the manual. The repository is distributed under the MIT License.
+
+**Author**  
+Adib Keikhosravi, Ph.D.  
+Staff Scientist, Laboratory of Receptor Biology and Gene Expression, CCR, NCI  
+National Institutes of Health  
+Email: adib.keikhosravi@nih.gov
+
