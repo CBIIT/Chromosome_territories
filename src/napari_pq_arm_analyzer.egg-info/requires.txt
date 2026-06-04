@@ -9,7 +9,7 @@ joblib
 tifffile
 aicsimageio
 matplotlib
-cellpose
+cellpose<4,>=2
 
 [extra-readers]
 readlif

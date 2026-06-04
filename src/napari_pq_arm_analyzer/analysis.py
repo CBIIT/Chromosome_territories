@@ -162,7 +162,7 @@ class AnalysisParameters:
     gpu: bool = False
     diameter: float = 30.0
     xy_downsample: float = 2.0
-    min_nucleus_volume_um3: float = 50.0
+    min_nucleus_volume_um3: float = 5.0
     bbox_pad_xy: int = 32
     cellprob_threshold: float = 0.0
     flow_threshold: float = 0.4
@@ -177,10 +177,10 @@ class AnalysisParameters:
 
     # Method selector and common arm parameters
     arm_detection_method: str = "Upgraded 1D GMM + gate + scoring"
-    gmm_components: int = 2
+    gmm_components: int = 4
     auto_choose_gmm_components_by_bic: bool = False
-    p_min_sorted_class: int = 1
-    q_min_sorted_class: int = 1
+    p_min_sorted_class: int = 3
+    q_min_sorted_class: int = 3
     gmm_covariance_type: str = "full"
     gmm_random_state: int = 0
     max_voxels_per_nucleus_fit: int = 50000
@@ -215,7 +215,7 @@ class AnalysisParameters:
     probability_high_threshold: float = 0.75
 
     # Component scoring
-    component_selection: str = "best_score"
+    component_selection: str = "all_passing_score"
     component_score_threshold: float = 0.30
     component_weight_probability: float = 1.00
     component_weight_contrast: float = 0.60
@@ -499,19 +499,37 @@ def _cellpose_eval_filtered(model, image, eval_kwargs: dict):
     """Call Cellpose eval while filtering keyword arguments for version compatibility.
 
     Cellpose versions differ in the exact keyword arguments accepted by ``eval``.
-    This helper first tries the full argument set, then retries with unsupported
-    keys removed. It also normalizes the return convention: Cellpose commonly
-    returns ``(masks, flows, styles, diams)``, but some wrappers may return masks
-    directly. A direct list of 2D masks must not be mistaken for the tuple-like
-    Cellpose return value.
+    This helper filters unsupported keys before calling Cellpose. For 3D ZYX
+    grayscale stacks, it also supplies ``z_axis=0`` when the installed Cellpose
+    version supports that keyword. This protects users who accidentally run with
+    newer Cellpose releases, while the package dependency still pins Cellpose to
+    ``>=2,<4`` for the validated workflow.
     """
     import inspect
 
-    try:
-        result = model.eval(image, **eval_kwargs)
-    except TypeError:
-        sig = inspect.signature(model.eval)
+    sig = inspect.signature(model.eval)
+    accepts_var_kwargs = any(
+        par.kind == inspect.Parameter.VAR_KEYWORD for par in sig.parameters.values()
+    )
+    if accepts_var_kwargs:
+        filtered = dict(eval_kwargs)
+    else:
         filtered = {k: v for k, v in eval_kwargs.items() if k in sig.parameters}
+
+    image_arr = np.asarray(image)
+    if bool(filtered.get("do_3D", False)) and image_arr.ndim == 3:
+        if "z_axis" in sig.parameters:
+            filtered.setdefault("z_axis", 0)
+        if "channel_axis" in sig.parameters:
+            filtered.setdefault("channel_axis", None)
+
+    try:
+        result = model.eval(image, **filtered)
+    except TypeError:
+        # Last-resort fallback for Cellpose wrappers with non-introspectable
+        # signatures. Remove known legacy-only keys and retry once.
+        for legacy_key in ("net_avg",):
+            filtered.pop(legacy_key, None)
         result = model.eval(image, **filtered)
 
     if isinstance(result, tuple):
@@ -532,6 +550,8 @@ def _eval_cellpose_model(model, image_u8: np.ndarray, anisotropy: float, params:
     eval_kwargs = dict(
         channels=[0, 0],
         do_3D=True,
+        z_axis=0,
+        channel_axis=None,
         anisotropy=float(anisotropy),
         diameter=float(params.diameter),
         stitch_threshold=float(params.stitch_threshold),
@@ -2245,7 +2265,7 @@ def run_full_analysis(
     # parameter set can be reloaded later from the GUI.
     run_configuration = {
         "plugin": "napari-pq-arm-analyzer",
-        "plugin_version": "0.3.4",
+        "plugin_version": "0.3.5",
         "source_image_path": str(source_image_path) if source_image_path is not None else None,
         "scene_name": scene_name,
         "spacing_zyx_um": list(map(float, spacing_zyx)),

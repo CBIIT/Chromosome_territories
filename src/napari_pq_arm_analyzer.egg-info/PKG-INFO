@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: napari-pq-arm-analyzer
-Version: 0.3.4
+Version: 0.3.6
 Summary: Interactive napari plugin for Cellpose nuclei segmentation, streamlined P/Q arm segmentation, batch scene analysis, saved configurations, and expanded 3D measurements.
 Author-email: "Adib Keikhosravi, Ph.D." <adib.keikhosravi@nih.gov>
 License: MIT
@@ -22,18 +22,18 @@ Requires-Dist: joblib
 Requires-Dist: tifffile
 Requires-Dist: aicsimageio
 Requires-Dist: matplotlib
-Requires-Dist: cellpose
+Requires-Dist: cellpose<4,>=2
 Provides-Extra: extra-readers
 Requires-Dist: readlif; extra == "extra-readers"
 Requires-Dist: nd2reader; extra == "extra-readers"
 Requires-Dist: imaris-ims-file-reader; extra == "extra-readers"
 Dynamic: license-file
 
-# napari P/Q Arm Analyzer
+# Chromosome Territories napari Plugin
 
 ![P/Q Arm Analyzer UI](docs/images/plugin_screenshot.png)
 
-Interactive napari plugin for nuclei segmentation, P/Q-arm detection, batch scene analysis, mask export, CSV measurement export, and summary plot generation in 3D microscopy images.
+Interactive napari plugin for 3D nuclei segmentation, P/Q chromosome-arm territory detection, batch scene analysis, mask export, CSV measurement export, and summary plot generation in multi-channel microscopy images.
 
 **Author and repository owner**  
 Adib Keikhosravi, Ph.D.  
@@ -43,9 +43,11 @@ Email: adib.keikhosravi@nih.gov
 
 **License:** MIT License. See [`LICENSE`](LICENSE).
 
+---
+
 ## Version
 
-Current repository version: **0.3.4**
+Current repository version: **0.3.6**
 
 This version is streamlined for routine use. It keeps only three P/Q arm detection methods:
 
@@ -55,45 +57,146 @@ Upgraded 1D GMM + gate + scoring
 MRF/CRF refinement
 ```
 
-It also includes:
+Main features:
 
+- napari graphical interface with live preview layers;
+- multi-scene image loading and scene-checkbox batch analysis;
+- Cellpose nuclei segmentation with 3D and 2D-stack modes;
+- configurable P/Q arm detection using GMM probability models, presence gating, component scoring, and optional MRF/CRF refinement;
 - configuration save/load as JSON;
-- scene checkboxes for batch analysis;
-- cleaned napari visualization panel;
-- detailed hover/click help buttons for all visible parameters;
-- 3D shape and radial-position measurements;
-- a simplified public CSV output table with internal tuning/debug columns removed;
-- multi-format image loading for common microscopy formats.
+- mask, label, CSV, QC, plot, and configuration export;
+- 3D volume, overlap, contact, shape, centroid, radial-position, and shell measurements;
+- simplified public result table with internal tuning/debug columns removed;
+- detailed parameter help inside the GUI.
 
-The previous experimental P/Q arm methods and their GUI controls are not shown in this version. The P arm probability preview, Q arm probability preview, and binary nuclei mask preview layers are not added to the napari layer panel.
+The P arm probability preview, Q arm probability preview, and binary nuclei mask preview layers are intentionally not added to the napari layer panel. The probability maps can still be saved to disk when **Save probability maps** is enabled.
+
+---
+
+## Important Cellpose compatibility note
+
+This plugin is validated with **Cellpose 2.x/3.x**. Cellpose 4 changed parts of the Python API for 3D image evaluation, including 3D axis handling. To avoid the Beowulf/HPC error where Cellpose v4 asks for `z_axis`, the package dependency now pins Cellpose to:
+
+```text
+cellpose>=2,<4
+```
+
+A normal install with `python -m pip install -e .` will therefore install or keep a compatible Cellpose version. If you already have Cellpose 4 in the environment, reinstalling the plugin with dependencies enabled should downgrade Cellpose automatically. You can also force it manually:
+
+```bash
+python -m pip uninstall -y cellpose
+python -m pip install "cellpose>=2,<4"
+```
+
+Check your Cellpose version with:
+
+```bash
+python - <<'PY'
+import cellpose
+print(cellpose.__version__)
+PY
+```
+
+---
 
 ## Full manual
 
 The detailed user manual is included in:
 
 ```text
-docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.4.docx
+docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.6.docx
 ```
 
-The manual explains the workflow, every visible parameter, tuning recommendations, output files, remaining result columns, and an appendix on MRF/CRF refinement and component selection.
+The manual explains the workflow, every visible parameter, tuning recommendations, output files, remaining result columns, and appendices covering the mathematical and conceptual logic of GMM, MRF/CRF refinement, and component selection.
 
-## Repository screenshot
+---
 
-The README image link points to:
+## Repository URL
+
+The GitHub repository is:
 
 ```text
-docs/images/plugin_screenshot.png
+https://github.com/CBIIT/Chromosome_territories.git
 ```
 
-Replace that file with a screenshot exported from the napari plugin when you want the GitHub main page to show your final plugin image.
+The repository folder is named `Chromosome_territories`. The installed Python distribution/package name is currently `napari-pq-arm-analyzer`, so pip uninstall commands use `napari-pq-arm-analyzer`.
 
-## Installation
+---
 
-Install inside the same conda or Python environment used to run napari:
+## Installation from GitHub
+
+### 1. Load or install conda/mamba
+
+Use an environment that can run napari, Qt, Cellpose, and PyTorch. On a workstation with conda:
 
 ```bash
-python -m pip uninstall -y napari-pq-arm-analyzer
+conda --version
+```
+
+On a cluster, first load the appropriate conda/miniconda module if needed.
+
+### 2. Create a fresh environment
+
+Python 3.9 is recommended because it is compatible with the plugin, napari, and Cellpose versions used during development.
+
+Using conda:
+
+```bash
+conda create -n pq-arm-analyzer python=3.9 -y
+conda activate pq-arm-analyzer
+```
+
+Using mamba:
+
+```bash
+mamba create -n pq-arm-analyzer python=3.9 -y
+mamba activate pq-arm-analyzer
+```
+
+### 3. Upgrade basic packaging tools
+
+```bash
+python -m pip install --upgrade pip setuptools wheel
+```
+
+### 4. Install napari and a Qt backend
+
+```bash
+python -m pip install "napari[all]"
+```
+
+If your site recommends conda-forge for Qt/napari, this is also acceptable:
+
+```bash
+conda install -c conda-forge napari pyqt -y
+```
+
+### 5. Clone the repository
+
+```bash
+git clone https://github.com/CBIIT/Chromosome_territories.git
+cd Chromosome_territories
+```
+
+### 6. Install the plugin in editable mode
+
+Recommended full install, including optional image readers:
+
+```bash
+python -m pip install -e ".[extra-readers]"
+```
+
+Minimal install without optional readers:
+
+```bash
 python -m pip install -e .
+```
+
+The install will require `cellpose>=2,<4`, which avoids the Cellpose v4 3D API issue.
+
+### 7. Launch napari
+
+```bash
 napari
 ```
 
@@ -103,15 +206,78 @@ Open the widget from:
 Plugins > P/Q Arm Analyzer > P/Q Arm Analyzer
 ```
 
-Optional fallback readers can be installed if your environment needs extra support for LIF, ND2, or IMS files:
+---
+
+## Installation from a downloaded ZIP
+
+If you downloaded a repository ZIP instead of cloning from GitHub:
 
 ```bash
-python -m pip install readlif nd2reader imaris-ims-file-reader
+unzip Chromosome_territories.zip
+cd Chromosome_territories
+conda create -n pq-arm-analyzer python=3.9 -y
+conda activate pq-arm-analyzer
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install "napari[all]"
+python -m pip install -e ".[extra-readers]"
+napari
 ```
+
+---
+
+## Updating an existing installation
+
+From an existing clone:
+
+```bash
+cd Chromosome_territories
+git pull
+conda activate pq-arm-analyzer
+python -m pip install -e ".[extra-readers]"
+```
+
+For a clean reinstall:
+
+```bash
+conda activate pq-arm-analyzer
+python -m pip uninstall -y napari-pq-arm-analyzer
+python -m pip uninstall -y cellpose
+cd Chromosome_territories
+python -m pip install -e ".[extra-readers]"
+```
+
+---
+
+## Verifying the installation
+
+Run:
+
+```bash
+python - <<'PY'
+import napari_pq_arm_analyzer
+import cellpose
+print("Plugin version:", napari_pq_arm_analyzer.__version__)
+print("Cellpose version:", cellpose.__version__)
+PY
+```
+
+Expected plugin version:
+
+```text
+0.3.6
+```
+
+Expected Cellpose major version:
+
+```text
+2.x or 3.x
+```
+
+---
 
 ## Supported image formats
 
-The plugin uses AICSImageIO first when possible, with fallback readers for common file types. Supported paths include:
+The plugin uses AICSImageIO first when possible, with fallback readers for common microscopy formats. Supported paths include:
 
 ```text
 .lif
@@ -124,7 +290,17 @@ The plugin uses AICSImageIO first when possible, with fallback readers for commo
 .zarr
 ```
 
-Files with multiple scenes, series, fields, or tiles are exposed as selectable scenes. You can load one scene for interactive preview and check multiple scenes for batch analysis.
+Optional reader packages are installed by the `[extra-readers]` option:
+
+```text
+readlif
+nd2reader
+imaris-ims-file-reader
+```
+
+Files with multiple scenes, series, fields, positions, or tiles are exposed as selectable scenes. You can load one scene for interactive preview and check multiple scenes for batch analysis.
+
+---
 
 ## Quick workflow
 
@@ -139,6 +315,48 @@ Files with multiple scenes, series, fields, or tiles are exposed as selectable s
 9. Optionally save the current configuration.
 10. Optionally check multiple scenes for batch analysis.
 11. Click **Analyze and save all outputs**.
+
+---
+
+## Default parameters changed in v0.3.6
+
+The following default values were updated for routine use:
+
+```text
+Max GMM components: 4
+P: keep sorted class index >= 3
+Q: keep sorted class index >= 3
+Minimum nucleus volume (um^3): 5
+Component selection: all_passing_score
+Preview nucleus limit, 0=all: 0
+```
+
+These are defaults only. The GUI still allows you to tune the values for a specific dataset.
+
+---
+
+## Recommended starting settings
+
+For a first pass, start with:
+
+```text
+Nuclei segmentation mode: Cellpose 2D stack batch + overlap stitch, or Cellpose 3D whole volume if appropriate
+XY downsample factor: 2.0 for preview, reduce if boundaries are too coarse
+2D batch size: 8
+Worker count: 0
+Backend: threading
+Preview nucleus limit: 0 for all nuclei, or a smaller number for fast testing
+Arm method: Upgraded 1D GMM + gate + scoring
+Max GMM components: 4
+P/Q sorted class index: 3
+Probability threshold: 0.50
+Component selection: all_passing_score
+Binary morphology: off
+```
+
+For final analysis, keep **Analysis nucleus limit** set to 0 unless intentionally testing on a subset.
+
+---
 
 ## Configuration files
 
@@ -162,6 +380,10 @@ Batch analysis additionally saves:
 batch_pq_arm_analyzer_configuration.json
 ```
 
+Configuration files are the recommended way to preserve a tuned parameter set for future datasets.
+
+---
+
 ## Visible P/Q arm detection methods
 
 ### Legacy 1D GMM
@@ -170,17 +392,13 @@ Intensity-only baseline. A Gaussian mixture model is fitted inside each nucleus,
 
 ### Upgraded 1D GMM + gate + scoring
 
-Recommended starting method. It adds field-level intensity normalization, a presence/absence gate, probability thresholding, and connected-component scoring. This helps prevent false-positive P/Q masks in nuclei where the channel contains only noise.
+Recommended general method. It adds field-level intensity normalization, a presence/absence gate, probability thresholding, and connected-component scoring. This helps prevent false-positive P/Q masks in nuclei where the channel contains only noise.
 
 ### MRF/CRF refinement
 
 Boundary-refinement method. It starts from the upgraded GMM probability map and encourages neighboring voxels to agree while respecting image edges. It is useful when the upgraded method finds the correct general region but the boundary is ragged, speckled, or has small holes.
 
-## GUI simplification in v0.3.4
-
-Several advanced internal controls were removed from the GUI and fixed at conservative backend defaults. This keeps the interface focused on parameters that usually need user tuning: channels, nuclei size/downsampling, scene batching, GMM class selection, field normalization, presence gate thresholds, probability thresholding, component selection, and MRF/CRF boundary refinement.
-
-The fixed backend defaults are still recorded in the configuration and parameter JSON files for reproducibility.
+---
 
 ## Napari layers shown
 
@@ -202,6 +420,8 @@ P/Q overlap preview
 ```
 
 The P, Q, and overlap masks are Image layers, so colormap/color changes should behave like raw image channels. The nuclei layer remains a Labels layer because it stores object identities.
+
+---
 
 ## Main output files
 
@@ -230,58 +450,115 @@ plots/*.png
 plots/plot_summary.txt
 ```
 
+---
+
 ## Public result table
 
-The public per-nucleus CSV keeps the most useful biological/image-analysis measurements: volumes, volume fractions, overlap, contact, minimum edge distance, centroids, shape metrics, and continuous 3D radial-position metrics.
+The public per-nucleus CSV keeps the most useful image-analysis measurements:
+
+- nucleus, P, Q, and overlap volumes;
+- P and Q volume fractions relative to the nucleus;
+- overlap volume and overlap fractions normalized to P and Q;
+- contact state and minimum edge-to-edge distance;
+- centroid coordinates;
+- shape metrics such as surface area, sphericity, compactness, equivalent sphere diameter, PCA axes, elongation, flatness, and extent;
+- continuous 3D radial-position metrics;
+- shell fractions except for requested diagnostic/removed shell columns.
 
 Internal tuning/debug columns are intentionally omitted from the public CSV. Removed columns include field-background medians/MADs, presence-gate diagnostics, BIC/LLR diagnostics, GMM means, component diagnostic scores, selected bounding-box dimensions, selected distance-transform raw values, and the requested shell-1 fraction columns.
 
 See the manual for a detailed explanation of every remaining column.
 
+---
+
 ## Plots
 
 The plot set includes summary figures for arm volume fraction, P/Q overlap, contact frequency, minimum edge distance, P versus Q volume, mean arm volume versus overlap, centroid separation, radial centroid position, and shape/sphericity summaries when the required columns are present.
 
-Plots associated only with removed diagnostic columns are not generated in this version.
+Plots associated only with removed diagnostic columns are not generated.
 
-## Recommended starting settings for large 57-slice images
+---
 
-```text
-Nuclei segmentation mode: Cellpose 2D stack batch + overlap stitch
-XY downsample factor: 2.0
-2D batch size: 8
-Worker count: 0
-Backend: threading
-Preview nucleus limit: 10 to 25
-Arm method: Upgraded 1D GMM + gate + scoring
-Max GMM components: 2
-P/Q sorted class index: 1
-Probability threshold: 0.50
-Binary morphology: off
-```
-
-After the preview looks good, set **Analysis nucleus limit** to 0 and run the full analysis.
-
-## Development notes
-
-This repository is structured as a standard editable Python package:
+## Repository layout
 
 ```text
-src/napari_pq_arm_analyzer/
-    _widget.py       # napari GUI and parameter handling
-    analysis.py      # nuclei segmentation, arm detection, measurements, outputs
-    image_io.py      # image/scene loading
-    plotting.py      # summary plot generation
-    napari.yaml      # napari plugin manifest
-examples/
-    launch_widget.py
-
-docs/manual/
-    PQ_Arm_Analyzer_User_Manual_v0.3.4.docx
-
-docs/images/
+Chromosome_territories/
+  README.md
+  LICENSE
+  CHANGELOG.md
+  pyproject.toml
+  MANIFEST.in
+  src/napari_pq_arm_analyzer/
+    __init__.py
+    _widget.py
+    analysis.py
+    help_text.py
+    image_io.py
+    plotting.py
+    napari.yaml
+  docs/manual/
+    PQ_Arm_Analyzer_User_Manual_v0.3.6.docx
+  docs/images/
     plugin_screenshot.png
+  examples/
+    launch_widget.py
 ```
+
+---
+
+## Troubleshooting
+
+### Cellpose v4 error: `z_axis must be specified`
+
+Install the validated Cellpose range:
+
+```bash
+python -m pip uninstall -y cellpose
+python -m pip install "cellpose>=2,<4"
+python -m pip install -e .
+```
+
+The plugin dependency now enforces this range during normal installation.
+
+### Qt warning: `XDG_RUNTIME_DIR not set`
+
+This warning is common in remote or HPC sessions. You can set:
+
+```bash
+mkdir -p /tmp/runtime-$USER
+chmod 700 /tmp/runtime-$USER
+export XDG_RUNTIME_DIR=/tmp/runtime-$USER
+```
+
+### Napari does not open over SSH
+
+Use an interactive graphical session, X forwarding, or a cluster-supported remote desktop/VNC session. napari requires a working Qt display.
+
+### Optional readers are missing
+
+Install:
+
+```bash
+python -m pip install -e ".[extra-readers]"
+```
+
+or install individual readers:
+
+```bash
+python -m pip install readlif nd2reader imaris-ims-file-reader
+```
+
+---
+
+## Uninstall
+
+```bash
+python -m pip uninstall -y napari-pq-arm-analyzer
+```
+
+This removes the installed plugin package from the environment. It does not delete your repository clone or output files.
+
+---
 
 ## Citation and attribution
 

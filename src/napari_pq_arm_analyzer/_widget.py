@@ -54,7 +54,7 @@ from .analysis import (
 )
 from .image_io import SUPPORTED_IMAGE_FILTER
 
-PLUGIN_VERSION = "0.3.4"
+PLUGIN_VERSION = "0.3.5"
 
 
 def _token(text: str) -> str:
@@ -67,434 +67,15 @@ def _token(text: str) -> str:
     return "".join(keep).strip("_") or "scene"
 
 
-PARAMETER_INFO: dict[str, str] = {
-    "image_path": """Load Image...
-
-What it is: Opens a file browser so you can choose the microscopy image to analyze. Supported formats include LIF, CZI, ND2, IMS, OME-TIFF, TIFF, LSM, and Zarr when the corresponding reader package is installed.
-
-How it affects the result: This does not change segmentation directly, but it determines the image data, metadata, physical voxel size, and scene list used by all later steps. If the reader reports incorrect voxel spacing, physical measurements such as volume, distance, and radial position will also be wrong.
-
-Practical advice: After loading, check the reported CZYX shape and ZYX spacing in the status panel. If the channel count or z-slice count looks wrong, try another scene or verify the file reader dependencies.""",
-    "preview_scene": """Preview scene
-
-What it is: Selects one scene, series, field of view, or tile from the file for interactive preview in napari.
-
-How it affects the result: The preview scene is the scene shown in napari while you tune parameters. It is also the scene analyzed if you do not check any scenes in the scene checklist.
-
-Practical advice: Load one representative scene first, tune all parameters, then check multiple scenes for batch analysis with the same saved settings.""",
-    "scene_checklist": """Scenes to analyze
-
-What it is: A checkbox list of all scenes found in the image file.
-
-How it affects the result: If no scene is checked, Analyze uses only the currently loaded preview scene. If one or more scenes are checked, Analyze runs all checked scenes with the current parameter set and saves each scene into its own result folder.
-
-Practical advice: Tune on one scene, save the configuration, then check the scenes you want to process in batch. Use this when multiple fields should be analyzed with the same parameter settings.""",
-    "output_folder": """Output folder
-
-What it is: The base folder where masks, CSV tables, plots, QC files, and configuration JSON files are saved.
-
-How it affects the result: Single-scene analysis writes directly into this folder. Batch analysis creates one subfolder per checked scene.
-
-Practical advice: Choose a new empty folder for final runs. Every analysis also saves a configuration JSON so the exact parameter set can be reused later.""",
-    "nuc_channel": """Nucleus channel
-
-What it is: The 1-based channel number used for nuclei segmentation.
-
-How it affects the result: The nucleus mask defines the boundary within which P/Q arms are detected. If the wrong channel is selected, Cellpose will segment the wrong signal or fail.
-
-How to tune: If nuclei are missing, merged, or located in the wrong channel, check this first before changing Cellpose parameters.""",
-    "p_channel": """P-arm channel
-
-What it is: The 1-based channel number used to detect the P arm signal.
-
-How it affects the result: All P-arm GMM fitting, probability maps, masks, volumes, centroids, shape metrics, and overlaps are calculated from this channel inside each segmented nucleus.
-
-How to tune: If the P mask is empty, appears on the Q signal, or follows the wrong raw channel, correct this channel index first.""",
-    "q_channel": """Q-arm channel
-
-What it is: The 1-based channel number used to detect the Q arm signal.
-
-How it affects the result: All Q-arm GMM fitting, probability maps, masks, volumes, centroids, shape metrics, and overlaps are calculated from this channel inside each segmented nucleus.
-
-How to tune: If P and Q appear swapped, check both P-arm and Q-arm channel numbers.""",
-    "cellpose_model": """Cellpose model
-
-What it is: The pretrained Cellpose model used for nuclei segmentation.
-
-How it affects the result: The model changes the type of object Cellpose expects. The 'nuclei' model is the usual starting choice for DNA or nuclear stains. Cytoplasm-style models may behave differently and are only useful if the nuclear channel looks unlike a standard nuclear stain.
-
-How to tune: Start with 'nuclei'. Change the model only if the nucleus preview is clearly poor after reasonable diameter and downsample adjustments.""",
-    "cellpose_mode": """Nuclei segmentation mode
-
-What it is: Controls how Cellpose is applied to the 3D stack.
-
-Cellpose 3D whole volume: runs Cellpose in 3D and can use z-continuity, but can be slower and memory-heavy.
-
-Cellpose 2D stack batch + overlap stitch: runs 2D segmentation on z-slices, then stitches labels across z by overlap. This is usually best for large 57-slice images.
-
-Cellpose 2D parallel slices + overlap stitch: uses CPU parallelization for slices or chunks. It can be useful on CPU-only systems but is usually not used with GPU because multiple GPU processes can conflict.
-
-How to tune: For large 2048 x 2048 x 57 images, start with 2D stack batch + overlap stitch, XY downsample 2, and batch size 8.""",
-    "gpu": """Use GPU
-
-What it is: Allows Cellpose to use the GPU if PyTorch and Cellpose are installed with GPU support.
-
-How it affects the result: It should not change the mathematical segmentation goal, but it can greatly reduce runtime. If GPU memory is insufficient, Cellpose may fail or become unstable.
-
-How to tune: Use GPU when available. If you see GPU memory errors, uncheck this option or increase XY downsample.""",
-    "diameter": """Cell / nucleus diameter
-
-What it is: Approximate nucleus diameter in pixels after XY downsampling.
-
-How it affects the result: This is a size prior for Cellpose. Larger values tell Cellpose to expect larger nuclei; smaller values tell it to expect smaller nuclei.
-
-Increase when: one nucleus is split into several pieces.
-
-Decrease when: neighboring nuclei are merged into one label.
-
-Practical advice: Change this gradually and rerun Preview nuclei masks after each change.""",
-    "xy_downsample": """XY downsample factor
-
-What it is: Downsamples the image in X and Y before Cellpose. A value of 1 means no downsampling. A value of 2 halves width and height, reducing XY pixel count about 4-fold.
-
-How it affects the result: Higher values are faster and use less memory, but boundaries are less precise. Lower values preserve boundaries but are slower.
-
-Practical advice: Use 2.0 for large previews. If nuclei boundaries look blocky or inaccurate, reduce toward 1.0 for final analysis.""",
-    "min_nucleus_volume": """Minimum nucleus volume
-
-What it is: The smallest physical volume, in cubic micrometers, that a Cellpose object must have to be kept as a nucleus.
-
-How it affects the result: Increasing it removes small debris and false nuclei. Decreasing it keeps smaller real nuclei but may keep noise.
-
-Practical advice: If many tiny labels appear, increase this value. If small real nuclei disappear, decrease it.""",
-    "cellpose_batch": """2D batch size
-
-What it is: Number of 2D z-slices passed to Cellpose at once in stack-batch mode.
-
-How it affects the result: It mainly affects speed and memory, not the intended segmentation. Larger batches can improve GPU/CPU efficiency but use more memory.
-
-How to tune: Start with 8. If you get memory errors, reduce it to 4 or 2. If the system has ample memory, increasing it may speed Cellpose.""",
-    "cellpose_overlap": """2D z-stitch overlap fraction
-
-What it is: After 2D segmentation, objects in neighboring z-slices are linked into 3D nuclei if their overlap is high enough.
-
-How it affects the result: Higher values require stronger overlap and reduce false joining, but can split nuclei across z. Lower values join more slices and reduce fragmentation, but can merge nearby nuclei.
-
-Practical range: 0.05 to 0.30. Increase if adjacent nuclei merge across z. Decrease if the same nucleus breaks into many z-fragments.""",
-    "auto_cellpose": """Auto-run nuclei preview when Cellpose parameters change
-
-What it is: Automatically reruns Cellpose after nuclei parameters are changed.
-
-How it affects the result: It does not change analysis itself, but it can make tuning easier on small images and very slow on large 3D fields.
-
-Practical advice: Leave unchecked for large images. Manually click Preview nuclei masks when ready.""",
-    "parallel_jobs": """Worker count
-
-What it is: Number of CPU workers used for per-nucleus P/Q arm detection and measurement. 0 means automatic selection.
-
-How it affects the result: It changes runtime, not the mathematical result. Too many workers can increase memory pressure and slow the computer.
-
-Practical advice: Start with 0 or 4 to 8 on large images. Use sequential only for debugging.""",
-    "parallel_backend": """Backend for per-nucleus work
-
-What it is: Controls the parallel execution method for per-nucleus analysis.
-
-threading: usually best because large image arrays are shared in memory.
-
-loky: uses separate processes. It can help CPU-heavy operations but may copy memory and can be slower on large images.
-
-sequential: one worker, slow but easiest to debug.
-
-Practical advice: Start with threading.""",
-    "method": """Detection method
-
-What it is: Selects the mathematical method for P/Q arm detection.
-
-Legacy 1D GMM: intensity-only baseline. It is fast and simple but can segment noise because it always tries to split intensities into classes.
-
-Upgraded 1D GMM + gate + scoring: recommended default. It adds field normalization, presence/absence gating, and component scoring.
-
-MRF/CRF refinement: starts from the upgraded method and adds spatial boundary refinement, making masks smoother and more coherent when the probability map is already approximately correct.
-
-Practical advice: Start with Upgraded GMM. Use MRF/CRF if boundaries are ragged or noisy.""",
-    "gmm_components": """Max GMM components
-
-What it is: Maximum number of Gaussian intensity classes fit inside each nucleus.
-
-How it affects the result: With 2 components, the model usually separates background-like voxels from bright signal-like voxels. With 3 or more, it can model low, medium, and high signal.
-
-Increase when: the real P/Q arm has multiple brightness levels and 2 components misses part of it.
-
-Decrease when: the model splits noise into artificial signal classes.
-
-Practical advice: Start with 2.""",
-    "auto_bic": """Auto-choose 1D GMM components by BIC
-
-What it is: Allows the plugin to compare candidate GMMs and choose the component count that best balances fit quality and model complexity.
-
-How it affects the result: It can adapt to variable nuclei but is slower and can make results less predictable across repeated tuning.
-
-Practical advice: Leave off for speed and reproducibility. Turn on if some nuclei clearly need 2 components and others need 3.""",
-    "p_min_class": """P: keep sorted class index greater than or equal to
-
-What it is: After fitting the GMM, intensity classes are sorted from dimmest to brightest. This value chooses which classes are treated as P-arm signal.
-
-For 2 components: 1 keeps the brighter class only, usually the best starting point.
-
-For 3 components: 1 keeps medium plus bright classes; 2 keeps only the brightest class.
-
-Increase when: the P mask includes too much background.
-
-Decrease when: the P mask misses dim true signal.""",
-    "q_min_class": """Q: keep sorted class index greater than or equal to
-
-What it is: Same as the P class threshold, but applied to the Q channel.
-
-How it affects the result: Raising the value keeps only brighter Q voxels. Lowering it includes dimmer Q voxels.
-
-Practical advice: Tune P and Q separately because the two channels can differ in brightness, noise, and background.""",
-    "norm_mode": """Normalization mode
-
-What it is: Defines how the plugin estimates background intensity for field-level robust normalization before upgraded arm detection.
-
-none: no normalization.
-outside_nuclei: background from voxels outside nuclei.
-nuclear_low_percentile: low-intensity nuclear voxels.
-whole_image_low_percentile: low-intensity voxels from the full image.
-mixed_outside_or_low_percentile: uses outside-nuclei background when available and falls back to percentile estimates.
-
-How it affects the result: Good normalization helps the algorithm compare each nucleus to the field context and avoid calling random noise a real arm.
-
-Practical advice: Start with mixed_outside_or_low_percentile.""",
-    "background_percentile": """Background percentile
-
-What it is: Low-intensity percentile used to estimate background when a percentile-based normalization mode is used.
-
-How it affects the result: Higher values include more voxels in the background estimate and may accidentally include dim real signal. Lower values use only darker voxels and can underestimate background in noisy images.
-
-Practical advice: Start around 35 percent. Decrease if true dim signal is being treated as background. Increase if background is underestimated.""",
-    "max_context_voxels": """Max voxels for field context
-
-What it is: Maximum number of voxels sampled from the field to estimate background/context statistics.
-
-How it affects the result: Larger samples give more stable normalization but take longer. Smaller samples are faster but noisier.
-
-Practical advice: Use the default for normal runs. Increase only if field normalization looks unstable across scenes.""",
-    "enable_gate": """Enable explicit presence/absence gate
-
-What it is: Allows the plugin to reject a nucleus as having no detectable P or Q arm signal.
-
-How it affects the result: This is the main protection against false positives in nuclei where the arm signal is absent or too weak. When disabled, the GMM is more likely to segment noise.
-
-Practical advice: Keep enabled when some nuclei may lack true signal or when background noise is present. Disable only temporarily to diagnose why masks are empty.""",
-    "min_delta_bic": """Minimum Delta BIC / LLR
-
-What it is: A threshold for how much better a multi-class signal/background model must fit compared with a simple one-class background-like model.
-
-How it affects the result: Increasing it makes the method stricter and reduces false positives. Decreasing it accepts weaker or dimmer signal but may allow noise.
-
-How to tune: If nuclei with no signal still get masks, increase this value. If true dim arms are rejected, decrease it.""",
-    "min_snr": """Minimum signal SNR
-
-What it is: Requires the bright part of the nuclear intensity distribution to stand out from lower-intensity voxels.
-
-How it affects the result: Higher SNR is stricter and reduces noisy detections. Lower SNR recovers dim signal but can add false positives.
-
-How to tune: Increase when noise is segmented. Decrease when real signal is visible but rejected.""",
-    "min_signal_fraction": """Minimum expected signal fraction
-
-What it is: Minimum fraction of the nucleus expected to be above the probability threshold before accepting signal.
-
-How it affects the result: Increasing it rejects tiny speckles. Decreasing it allows very small territories.
-
-How to tune: Increase if single-pixel or small-dot noise is accepted. Decrease if true P/Q territories are very small.""",
-    "max_signal_fraction": """Maximum expected signal fraction
-
-What it is: Maximum fraction of the nucleus allowed to be classified as P/Q signal during the presence gate.
-
-How it affects the result: It prevents the algorithm from labeling most of the nucleus as arm signal.
-
-How to tune: Decrease if masks are too large and cover broad background. Increase only if the true territory really occupies a large portion of the nucleus.""",
-    "min_mean_posterior": """Minimum mean posterior
-
-What it is: Minimum average GMM probability required among signal-like voxels.
-
-How it affects the result: Increasing it keeps only high-confidence detections. Decreasing it accepts dimmer or more ambiguous signal.
-
-How to tune: Increase if uncertain background is accepted. Decrease if visible true signal is being rejected.""",
-    "prob_threshold": """Probability threshold
-
-What it is: Converts the GMM probability map into a binary arm mask. A voxel is included if its signal probability is greater than or equal to the threshold.
-
-How it affects the result: Higher values produce smaller, stricter masks. Lower values produce larger, more inclusive masks.
-
-How to tune: Increase to remove background and uncertain edges. Decrease to recover missing dim parts of a real arm. Around 0.50 is a common starting point.""",
-    "arm_smoothing": """Arm Gaussian smoothing sigma
-
-What it is: Optional Gaussian smoothing applied to the P and Q channels before arm detection.
-
-How it affects the result: Small smoothing reduces speckle noise. Too much smoothing blurs boundaries and can merge nearby signal with background.
-
-How to tune: Start at 0.0. Try 0.5 to 1.0 if the raw arm channels are very speckled.""",
-    "apply_morphology": """Apply binary opening/closing after detection
-
-What it is: Enables traditional binary morphology after probability thresholding.
-
-How it affects the result: Opening can remove tiny objects. Closing can fill gaps. These operations do not use intensity, so they can also remove true fragments or add adjacent background.
-
-Practical advice: Use sparingly. If morphology attaches background near P/Q arms, turn it off and use MRF/CRF refinement instead.""",
-    "opening_radius": """Binary opening radius
-
-What it is: Radius of binary opening after detection.
-
-How it affects the result: Opening removes small islands and thin protrusions. Larger values remove more noise but may erode real P/Q signal.
-
-How to tune: Use 0 or 1. Increase only when obvious speckle noise remains.""",
-    "closing_radius": """Binary closing radius
-
-What it is: Radius of binary closing after detection.
-
-How it affects the result: Closing fills small holes and bridges small gaps. Larger values make masks more connected but can attach nearby background or noise.
-
-How to tune: Use 0 or 1. Increase only when true arms are artificially fragmented.""",
-    "min_arm_volume": """Minimum arm volume
-
-What it is: Minimum physical volume required for an accepted P/Q component.
-
-How it affects the result: Increasing it removes small false-positive objects. Decreasing it keeps smaller true territories but may keep noise.
-
-How to tune: Increase if tiny dots are accepted. Decrease if true small P/Q arms disappear.""",
-    "component_selection": """Component selection
-
-What it is: Decides which connected 3D objects are kept after thresholding and optional MRF/CRF refinement.
-
-largest: keeps only the largest component.
-best_score: keeps the highest-scoring component.
-all_passing_score: keeps every component with score above threshold.
-all_after_size_filter: keeps all components above minimum arm volume.
-none: keeps the binary mask without object-level filtering.
-
-How it affects the result: This chooses the final object or objects. For most images, start with best_score. Use all_passing_score if true signal is split into multiple separated pieces.""",
-    "component_score": """Component score threshold
-
-What it is: Minimum score required for a component to be kept in score-based modes.
-
-How it affects the result: Higher threshold is stricter and removes weak components. Lower threshold keeps more components.
-
-How to tune: Increase if noise components survive. Decrease if real components are removed.""",
-    "comp_prob_w": """Component weight: probability
-
-What it is: Weight for average voxel probability in component scoring.
-
-How it affects the result: Increasing it favors components whose voxels have high GMM signal confidence.
-
-How to tune: Increase if low-confidence fragments are kept. Decrease if dim but real components are rejected.""",
-    "comp_contrast_w": """Component weight: contrast
-
-What it is: Weight for local intensity contrast in component scoring.
-
-How it affects the result: Increasing it favors objects brighter than their immediate surroundings and rejects diffuse background.
-
-How to tune: Increase if background patches are kept. Decrease if true signal has weak local contrast.""",
-    "comp_volume_w": """Component weight: volume
-
-What it is: Weight for component volume in component scoring.
-
-How it affects the result: Increasing it favors larger coherent territories over small specks. Decreasing it allows small true objects.
-
-How to tune: Increase when small noise survives. Decrease when true P/Q arms are small.""",
-    "comp_boundary_w": """Component boundary penalty
-
-What it is: Penalty for rough, jagged, or boundary-like components.
-
-How it affects the result: Increasing it removes speckled or irregular masks but can reject true irregular territories. Decreasing it keeps irregular shapes but may keep noise.
-
-How to tune: Increase if masks include noisy rims or background attached to edges. Decrease if real signal near the nuclear edge is rejected.""",
-    "mrf_iterations": """MRF iterations
-
-What it is: Number of MRF/CRF refinement passes applied when the MRF/CRF method is selected.
-
-How it affects the result: More iterations make masks smoother and more spatially coherent, but they can over-smooth, over-expand, or connect nearby objects.
-
-How to tune: Start with 3 to 5. Decrease if masks grow into background. Increase slightly if boundaries remain noisy.""",
-    "mrf_lambda": """MRF lambda
-
-What it is: Strength of neighborhood agreement during MRF/CRF refinement.
-
-How it affects the result: Higher lambda makes neighboring voxels more likely to share the same label, which smooths boundaries and removes isolated specks. Too high can pull background into the mask.
-
-How to tune: Start around 1.0. Lower it if masks over-expand. Raise it if masks are ragged or fragmented.""",
-    "mrf_edge_sigma": """MRF edge sigma
-
-What it is: Controls how strongly image intensity edges stop MRF/CRF smoothing.
-
-How it affects the result: Smaller values preserve sharp edges more strongly and reduce leakage into background. Larger values allow more smoothing across weak edges and can fill patchy signal.
-
-How to tune: Decrease if masks leak into adjacent background. Increase slightly if true signal remains fragmented.""",
-    "contact_radius": """Contact dilation radius
-
-What it is: Voxel dilation radius used to decide whether P and Q masks are in contact.
-
-How it affects the result: Larger values count near-touching P and Q territories as contact. Smaller values require closer physical contact.
-
-Practical advice: Use 0 for strict overlap/touching. Use 1 for tolerant contact measurement.""",
-    "n_shells": """Radial shells
-
-What it is: Number of concentric nuclear shells used internally for shell-style radial summaries.
-
-How it affects the result: More shells provide finer radial bins but can be noisier. The main reported radial position columns use a continuous 3D distance-transform coordinate from 0 at the nuclear center to 1 at the nuclear boundary.
-
-Practical advice: The default of 5 is usually sufficient.""",
-    "preview_limit": """Preview nucleus limit
-
-What it is: Maximum number of nuclei used for P/Q preview. 0 means all nuclei.
-
-How it affects the result: This only affects preview speed and displayed preview masks. It does not limit the final analysis unless Analysis nucleus limit is also changed.
-
-Practical advice: Use 10 to 25 while tuning large images.""",
-    "analysis_limit": """Analysis nucleus limit
-
-What it is: Maximum number of nuclei analyzed in the final run. 0 means all nuclei.
-
-How it affects the result: This directly controls how many nuclei appear in the final CSV and masks.
-
-Practical advice: Use 0 for final analysis. Use a small number only for test runs.""",
-    "auto_preview": """Live-update P/Q preview when arm parameters change
-
-What it is: Automatically updates P/Q preview after arm parameters change.
-
-How it affects the result: It does not change final analysis, but it can make tuning easier on small images and slow on large 3D images.
-
-Practical advice: Turn it off for large fields and click Preview P/Q arm masks manually.""",
-    "save_qc": """Save QC max projections
-
-What it is: Saves maximum-projection QC images for raw channels and nuclei labels.
-
-How it affects the result: It does not affect measurements but helps inspect saved outputs.
-
-Practical advice: Keep enabled for final runs.""",
-    "save_label_masks": """Save arm label masks by nucleus
-
-What it is: Saves label images where each P/Q arm voxel stores the ID of its parent nucleus.
-
-How it affects the result: It does not change measurements but makes it easier to trace each arm mask back to its nucleus.
-
-Practical advice: Keep enabled unless disk space is limited.""",
-    "save_prob_maps": """Save probability maps
-
-What it is: Saves P and Q probability maps as TIFF files.
-
-How it affects the result: It does not change masks. It provides troubleshooting information showing the voxel-wise confidence before thresholding and component selection.
-
-Practical advice: Keep enabled during method development. Disable later if disk space is a concern.""",
-    "reuse_nuclei": """Analyze using current nuclei preview if available
-
-What it is: Reuses the current nuclei preview during analysis if nuclei parameters have not changed.
-
-How it affects the result: It saves time because Cellpose is not rerun. If Cellpose settings changed, the plugin recomputes nuclei.
-
-Practical advice: Use this when you have already checked the nuclei preview and only changed arm-detection settings.""",
-}
+from .help_text import PARAMETER_INFO
+
+# Use the expanded help text module so hover/click help remains comprehensive
+# and consistent with the full user manual. If the module cannot be imported,
+# the fallback dictionary above is still available.
+try:
+    from .help_text import PARAMETER_INFO as PARAMETER_INFO  # type: ignore[no-redef]
+except Exception:
+    pass
 
 
 class PQArmAnalyzerWidget(QWidget):
@@ -605,7 +186,7 @@ class PQArmAnalyzerWidget(QWidget):
             w.setCurrentText(current)
         return w
 
-    def _info_button(self, title: str, info: str) -> QToolButton:
+    def _info_button(self, key: str, title: str, info: str) -> QToolButton:
         btn = QToolButton()
         btn.setText("i")
         btn.setToolTip(info)
@@ -615,21 +196,25 @@ class PQArmAnalyzerWidget(QWidget):
             "font-weight: bold; color: #1557a6; background: #eef5ff; }"
             "QToolButton:hover { background: #dbeaff; }"
         )
-        btn.clicked.connect(lambda _checked=False, t=title, txt=info: self._show_info_dialog(t, txt))
+        btn.clicked.connect(lambda _checked=False, k=key, t=title, txt=info: self._show_info_dialog(k, t, txt))
         return btn
 
-    def _show_info_dialog(self, title: str, info: str) -> None:
-        key = str(title)
+    def _show_info_dialog(self, key: str, title: str, info: str) -> None:
+        key = str(key)
         existing = self._info_dialogs.get(key)
         if existing is not None:
-            existing.show()
-            existing.raise_()
-            existing.activateWindow()
-            return
+            try:
+                existing.show()
+                existing.raise_()
+                existing.activateWindow()
+                return
+            except RuntimeError:
+                self._info_dialogs.pop(key, None)
 
         dlg = QDialog(self)
         dlg.setWindowTitle(f"Parameter help: {title}")
         dlg.setAttribute(Qt.WA_DeleteOnClose, True)
+        dlg.setWindowModality(Qt.NonModal)
         layout = QVBoxLayout(dlg)
         browser = QTextBrowser()
         browser.setOpenExternalLinks(False)
@@ -640,7 +225,7 @@ class PQArmAnalyzerWidget(QWidget):
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(dlg.close)
         layout.addWidget(close_btn)
-        dlg.resize(620, 420)
+        dlg.resize(760, 600)
         self._info_dialogs[key] = dlg
         dlg.destroyed.connect(lambda *_args, k=key: self._forget_info_dialog(k))
         dlg.show()
@@ -659,7 +244,7 @@ class PQArmAnalyzerWidget(QWidget):
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
             row_layout.addWidget(widget)
-            row_layout.addWidget(self._info_button(getattr(widget, "text", lambda: info_key)() or info_key, text))
+            row_layout.addWidget(self._info_button(info_key, getattr(widget, "text", lambda: info_key)() or info_key, text))
             row_layout.addStretch(1)
             form.addRow(row)
         else:
@@ -667,7 +252,7 @@ class PQArmAnalyzerWidget(QWidget):
             label_layout = QHBoxLayout(label_widget)
             label_layout.setContentsMargins(0, 0, 0, 0)
             label_layout.addWidget(QLabel(label))
-            label_layout.addWidget(self._info_button(label, text))
+            label_layout.addWidget(self._info_button(info_key, label, text))
             label_layout.addStretch(1)
             form.addRow(label_widget, widget)
 
@@ -733,7 +318,7 @@ class PQArmAnalyzerWidget(QWidget):
         self.gpu_check = QCheckBox("Use GPU")
         self.diameter_spin = self._dspin(30.0, 1.0, 500.0, step=1.0, decimals=1)
         self.xy_downsample_spin = self._dspin(2.0, 1.0, 8.0, step=0.25, decimals=2)
-        self.min_nucleus_volume_spin = self._dspin(50.0, 0.0, 1_000_000.0, step=5.0, decimals=2)
+        self.min_nucleus_volume_spin = self._dspin(5.0, 0.0, 1_000_000.0, step=1.0, decimals=2)
         self.cellpose_batch_spin = self._spin(8, 1, 256)
         self.cellpose_overlap_spin = self._dspin(0.10, 0.0, 1.0, step=0.05, decimals=3)
         self.auto_cellpose_check = QCheckBox("Auto-run nuclei preview when Cellpose parameters change (slow)")
@@ -759,11 +344,11 @@ class PQArmAnalyzerWidget(QWidget):
     def _build_arm_method_group(self) -> None:
         form = self._new_group("Arm detection method and GMM")
         self.method_combo = self._combo(ARM_DETECTION_METHODS, "Upgraded 1D GMM + gate + scoring")
-        self.gmm_components_spin = self._spin(2, 1, 8)
+        self.gmm_components_spin = self._spin(4, 1, 8)
         self.auto_bic_check = QCheckBox("Auto-choose 1D GMM components by BIC")
         self.auto_bic_check.setChecked(False)
-        self.p_min_class_spin = self._spin(1, 0, 7)
-        self.q_min_class_spin = self._spin(1, 0, 7)
+        self.p_min_class_spin = self._spin(3, 0, 7)
+        self.q_min_class_spin = self._spin(3, 0, 7)
 
         self._add_info_row(form, "Detection method", self.method_combo, "method")
         self._add_info_row(form, "Max GMM components", self.gmm_components_spin, "gmm_components")
@@ -807,7 +392,7 @@ class PQArmAnalyzerWidget(QWidget):
         self.opening_radius_spin = self._spin(0, 0, 20)
         self.closing_radius_spin = self._spin(0, 0, 20)
         self.min_arm_volume_spin = self._dspin(0.1, 0.0, 1_000_000.0, step=0.1, decimals=3)
-        self.component_combo = self._combo(COMPONENT_SELECTION_MODES, "best_score")
+        self.component_combo = self._combo(COMPONENT_SELECTION_MODES, "all_passing_score")
         self.component_score_spin = self._dspin(0.30, -100.0, 100.0, step=0.05, decimals=3)
         self.comp_prob_w_spin = self._dspin(1.0, -10.0, 10.0, step=0.1, decimals=3)
         self.comp_contrast_w_spin = self._dspin(0.6, -10.0, 10.0, step=0.1, decimals=3)
@@ -836,7 +421,7 @@ class PQArmAnalyzerWidget(QWidget):
         form = self._new_group("Measurements, preview, and output")
         self.contact_radius_spin = self._spin(1, 0, 20)
         self.n_shells_spin = self._spin(5, 1, 20)
-        self.preview_limit_spin = self._spin(25, 0, 100000)
+        self.preview_limit_spin = self._spin(0, 0, 100000)
         self.analysis_limit_spin = self._spin(0, 0, 100000)
         self.auto_preview_check = QCheckBox("Live-update P/Q preview when arm parameters change")
         self.auto_preview_check.setChecked(True)
