@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.7
+
+- Added collaborator-requested per-nucleus FISH signal-count measurements to the public results table: `p_fish_signal_count` and `q_fish_signal_count`.
+- These counts measure the number of disconnected 3D compartments in the final accepted P-arm and Q-arm masks after all segmentation, gating, refinement, morphology, and component-selection steps.
+- Added FISH signal-count summary fields to the population-summary CSV.
+- Added a summary plot, `fish_signal_count_distribution.png`, showing the P/Q FISH signal count distribution across nuclei.
+- Updated README and manual documentation for the new public result columns.
+
 ## v0.3.6
 
 - Updated default routine-analysis parameters: Max GMM components = 4, P/Q sorted class index thresholds = 3, minimum nucleus volume = 5 um^3, component selection = all_passing_score, and preview nucleus limit = 0.

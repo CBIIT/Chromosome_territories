@@ -95,6 +95,24 @@ def create_plots(
     plt.title("Distribution of P-Q minimum edge distance")
     savefig(plot_dir / "edge_distance_histogram.png")
 
+    if "p_fish_signal_count" in df.columns and "q_fish_signal_count" in df.columns:
+        p_counts = df["p_fish_signal_count"].fillna(0).astype(int)
+        q_counts = df["q_fish_signal_count"].fillna(0).astype(int)
+        max_count = int(max(p_counts.max() if len(p_counts) else 0, q_counts.max() if len(q_counts) else 0, 1))
+        x = np.arange(max_count + 1)
+        p_hist = np.array([(p_counts == i).sum() for i in x], dtype=float)
+        q_hist = np.array([(q_counts == i).sum() for i in x], dtype=float)
+        width = 0.38
+        plt.figure(figsize=(6, 4))
+        plt.bar(x - width / 2, p_hist, width=width, label="P arm")
+        plt.bar(x + width / 2, q_hist, width=width, label="Q arm")
+        plt.xlabel("Number of final FISH signal compartments per nucleus")
+        plt.ylabel("Number of nuclei")
+        plt.title("P/Q FISH signal count per nucleus")
+        plt.xticks(x)
+        plt.legend()
+        savefig(plot_dir / "fish_signal_count_distribution.png")
+
     plt.figure(figsize=(5.5, 5))
     plt.scatter(df["p_volume_um3"], df["q_volume_um3"], alpha=0.8)
     plt.xlabel("P-arm volume (um^3)")

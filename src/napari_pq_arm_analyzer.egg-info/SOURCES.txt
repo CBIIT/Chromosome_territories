@@ -6,6 +6,7 @@ pyproject.toml
 docs/images/README.md
 docs/images/plugin_screenshot.png
 docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.6.docx
+docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.7.docx
 src/napari_pq_arm_analyzer/__init__.py
 src/napari_pq_arm_analyzer/_widget.py
 src/napari_pq_arm_analyzer/analysis.py

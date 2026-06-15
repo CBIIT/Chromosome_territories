@@ -1,3 +1,9 @@
-# Repository images
+# Images
 
-`plugin_screenshot.png` is linked from the top of the main README. Replace it with a screenshot exported from napari after opening the P/Q Arm Analyzer plugin.
+`plugin_screenshot.png` is the image displayed at the top of the GitHub README.
+
+Replace this placeholder with a screenshot exported from napari after opening the plugin. Keep the same filename and relative path:
+
+```text
+docs/images/plugin_screenshot.png
+```

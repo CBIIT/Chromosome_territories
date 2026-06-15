@@ -1745,6 +1745,20 @@ def overlap_fraction(mask_a: np.ndarray, mask_b: np.ndarray) -> tuple[float, flo
     return fa, fb
 
 
+def connected_component_count_3d(mask: np.ndarray) -> int:
+    """Count disconnected 3D FISH-signal compartments in a final binary mask.
+
+    The count is measured after all arm-detection, gating, MRF/CRF, morphology,
+    and component-selection steps have been applied. A value of 0 means no final
+    signal was retained for that arm in the nucleus. The connectivity matches
+    scipy.ndimage.label's default 3D nearest-neighbor connectivity.
+    """
+    mask = np.asarray(mask, dtype=bool)
+    if mask.ndim != 3 or not np.any(mask):
+        return 0
+    _lbl, n = ndi.label(mask)
+    return int(n)
+
 
 
 def _mask_surface_area_um2(mask: np.ndarray, spacing_zyx: SpacingZYX) -> float:
@@ -1957,6 +1971,8 @@ def analyze_one_nucleus_from_subvolume(
         "nucleus_volume_um3": nuc_vol,
         "p_volume_um3": p_vol,
         "q_volume_um3": q_vol,
+        "p_fish_signal_count": connected_component_count_3d(p_mask),
+        "q_fish_signal_count": connected_component_count_3d(q_mask),
         "p_fraction_of_nucleus": p_frac,
         "q_fraction_of_nucleus": q_frac,
         "pq_overlap_volume_um3": ov_vol,
@@ -2119,9 +2135,33 @@ def make_population_summary(df: pd.DataFrame) -> dict:
     def col_mean(name: str) -> float:
         return float(df[name].mean()) if len(df) and name in df else float("nan")
 
+    def col_median(name: str) -> float:
+        return float(df[name].median()) if len(df) and name in df else float("nan")
+
+    def col_sum_int(name: str) -> int:
+        return int(df[name].fillna(0).sum()) if len(df) and name in df else 0
+
+    def frac_positive(name: str) -> float:
+        return float((df[name].fillna(0) > 0).mean()) if len(df) and name in df else float("nan")
+
+    both_pq = (
+        float(((df["p_fish_signal_count"].fillna(0) > 0) & (df["q_fish_signal_count"].fillna(0) > 0)).mean())
+        if len(df) and "p_fish_signal_count" in df and "q_fish_signal_count" in df
+        else float("nan")
+    )
+
     return {
         "n_nuclei": int(len(df)),
         "arm_detection_method": str(df["arm_detection_method"].iloc[0]) if len(df) and "arm_detection_method" in df else "",
+        "total_p_fish_signals": col_sum_int("p_fish_signal_count"),
+        "total_q_fish_signals": col_sum_int("q_fish_signal_count"),
+        "mean_p_fish_signal_count": col_mean("p_fish_signal_count"),
+        "mean_q_fish_signal_count": col_mean("q_fish_signal_count"),
+        "median_p_fish_signal_count": col_median("p_fish_signal_count"),
+        "median_q_fish_signal_count": col_median("q_fish_signal_count"),
+        "fraction_nuclei_with_p_signal": frac_positive("p_fish_signal_count"),
+        "fraction_nuclei_with_q_signal": frac_positive("q_fish_signal_count"),
+        "fraction_nuclei_with_both_p_and_q_signal": both_pq,
         "mean_nucleus_volume_um3": col_mean("nucleus_volume_um3"),
         "mean_p_fraction_of_nucleus": col_mean("p_fraction_of_nucleus"),
         "mean_q_fraction_of_nucleus": col_mean("q_fraction_of_nucleus"),

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: napari-pq-arm-analyzer
-Version: 0.3.6
+Version: 0.3.7
 Summary: Interactive napari plugin for Cellpose nuclei segmentation, streamlined P/Q arm segmentation, batch scene analysis, saved configurations, and expanded 3D measurements.
 Author-email: "Adib Keikhosravi, Ph.D." <adib.keikhosravi@nih.gov>
 License: MIT
@@ -47,7 +47,7 @@ Email: adib.keikhosravi@nih.gov
 
 ## Version
 
-Current repository version: **0.3.6**
+Current repository version: **0.3.7**
 
 This version is streamlined for routine use. It keeps only three P/Q arm detection methods:
 
@@ -65,8 +65,8 @@ Main features:
 - configurable P/Q arm detection using GMM probability models, presence gating, component scoring, and optional MRF/CRF refinement;
 - configuration save/load as JSON;
 - mask, label, CSV, QC, plot, and configuration export;
-- 3D volume, overlap, contact, shape, centroid, radial-position, and shell measurements;
-- simplified public result table with internal tuning/debug columns removed;
+- 3D volume, overlap, contact, shape, centroid, radial-position, shell, and per-nucleus FISH signal-count measurements;
+- simplified public result table with internal tuning/debug columns removed while keeping final P/Q FISH signal counts;
 - detailed parameter help inside the GUI.
 
 The P arm probability preview, Q arm probability preview, and binary nuclei mask preview layers are intentionally not added to the napari layer panel. The probability maps can still be saved to disk when **Save probability maps** is enabled.
@@ -104,7 +104,7 @@ PY
 The detailed user manual is included in:
 
 ```text
-docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.6.docx
+docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.7.docx
 ```
 
 The manual explains the workflow, every visible parameter, tuning recommendations, output files, remaining result columns, and appendices covering the mathematical and conceptual logic of GMM, MRF/CRF refinement, and component selection.
@@ -264,7 +264,7 @@ PY
 Expected plugin version:
 
 ```text
-0.3.6
+0.3.7
 ```
 
 Expected Cellpose major version:
@@ -318,7 +318,7 @@ Files with multiple scenes, series, fields, positions, or tiles are exposed as s
 
 ---
 
-## Default parameters changed in v0.3.6
+## Default parameters retained from v0.3.6
 
 The following default values were updated for routine use:
 
@@ -457,6 +457,7 @@ plots/plot_summary.txt
 The public per-nucleus CSV keeps the most useful image-analysis measurements:
 
 - nucleus, P, Q, and overlap volumes;
+- number of final segmented P-arm and Q-arm FISH signal compartments per nucleus (`p_fish_signal_count`, `q_fish_signal_count`);
 - P and Q volume fractions relative to the nucleus;
 - overlap volume and overlap fractions normalized to P and Q;
 - contact state and minimum edge-to-edge distance;
@@ -469,11 +470,25 @@ Internal tuning/debug columns are intentionally omitted from the public CSV. Rem
 
 See the manual for a detailed explanation of every remaining column.
 
+
+### FISH signal count columns
+
+The collaborator-requested FISH signal counts are saved directly in the per-nucleus CSV:
+
+```text
+p_fish_signal_count
+q_fish_signal_count
+```
+
+These are the counts of disconnected 3D compartments in the final accepted P-arm and Q-arm masks for each nucleus, after GMM detection, presence gating, optional MRF/CRF refinement, morphology, and component selection. A value of `0` means no final signal was retained for that arm in that nucleus. A value of `1` means one connected signal was retained. Values greater than `1` indicate that the arm signal was retained as multiple separated compartments.
+
+The population summary also includes total, mean, median, and positive-nucleus fractions for these signal-count columns.
+
 ---
 
 ## Plots
 
-The plot set includes summary figures for arm volume fraction, P/Q overlap, contact frequency, minimum edge distance, P versus Q volume, mean arm volume versus overlap, centroid separation, radial centroid position, and shape/sphericity summaries when the required columns are present.
+The plot set includes summary figures for arm volume fraction, P/Q overlap, contact frequency, FISH signal count per nucleus, minimum edge distance, P versus Q volume, mean arm volume versus overlap, centroid separation, radial centroid position, and shape/sphericity summaries when the required columns are present.
 
 Plots associated only with removed diagnostic columns are not generated.
 
@@ -497,7 +512,7 @@ Chromosome_territories/
     plotting.py
     napari.yaml
   docs/manual/
-    PQ_Arm_Analyzer_User_Manual_v0.3.6.docx
+    PQ_Arm_Analyzer_User_Manual_v0.3.7.docx
   docs/images/
     plugin_screenshot.png
   examples/
