@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "napari-pq-arm-analyzer"
-version = "0.3.7"
+version = "0.3.8"
 description = "Interactive napari plugin for Cellpose nuclei segmentation, streamlined P/Q arm segmentation, batch scene analysis, saved configurations, and expanded 3D measurements."
 readme = "README.md"
 requires-python = ">=3.9"

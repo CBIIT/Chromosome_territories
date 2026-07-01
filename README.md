@@ -16,7 +16,7 @@ Email: adib.keikhosravi@nih.gov
 
 ## Version
 
-Current repository version: **0.3.7**
+Current repository version: **0.3.8**
 
 This version is streamlined for routine use. It keeps only three P/Q arm detection methods:
 
@@ -73,7 +73,7 @@ PY
 The detailed user manual is included in:
 
 ```text
-docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.7.docx
+docs/manual/PQ_Arm_Analyzer_User_Manual_v0.3.8.docx
 ```
 
 The manual explains the workflow, every visible parameter, tuning recommendations, output files, remaining result columns, and appendices covering the mathematical and conceptual logic of GMM, MRF/CRF refinement, and component selection.
@@ -233,7 +233,7 @@ PY
 Expected plugin version:
 
 ```text
-0.3.7
+0.3.8
 ```
 
 Expected Cellpose major version:
@@ -407,6 +407,7 @@ p_arm_labels_by_nucleus_3d.tif           # if Save arm label masks is enabled
 q_arm_labels_by_nucleus_3d.tif           # if Save arm label masks is enabled
 pq_overlap_labels_by_nucleus_3d.tif      # if Save arm label masks is enabled
 series7_chrX_arm_measurements_per_nucleus.csv
+series7_chrX_arm_measurements_per_object.csv
 series7_chrX_arm_measurements_population_summary.csv
 analysis_parameters.json
 pq_arm_analyzer_configuration.json
@@ -439,6 +440,32 @@ Internal tuning/debug columns are intentionally omitted from the public CSV. Rem
 
 See the manual for a detailed explanation of every remaining column.
 
+
+### Per-object FISH signal table
+
+Version 0.3.8 adds a second public measurement table:
+
+```text
+series7_chrX_arm_measurements_per_object.csv
+```
+
+Each row in this file is one final connected 3D P-arm or Q-arm FISH signal object inside one nucleus. The row count equals the total number of retained P-arm objects plus the total number of retained Q-arm objects across the analyzed nuclei. The table includes source image metadata, scene name, parent nucleus/cell ID, arm identity, object index within that nucleus and arm, physical centroid, object volume, object fraction of the parent nucleus, per-object 3D radial-position metrics, and the same physical spacing-aware shape descriptors used for P/Q objects in the per-nucleus table.
+
+The key columns for linking back to the per-nucleus table are:
+
+```text
+source_image_path
+source_image_name
+scene_name
+nucleus_id
+cell_id
+arm
+object_index_within_nucleus_arm
+object_global_id
+object_unique_id
+```
+
+To recover per-nucleus P/Q signal counts from this table, group by `source_image_path`, `scene_name`, `nucleus_id`, and `arm`, then count rows.
 
 ### FISH signal count columns
 
@@ -481,7 +508,8 @@ Chromosome_territories/
     plotting.py
     napari.yaml
   docs/manual/
-    PQ_Arm_Analyzer_User_Manual_v0.3.7.docx
+    PQ_Arm_Analyzer_User_Manual_v0.3.8.docx
+    PQ_Arm_Analyzer_Plugin_v0_3_8.pptx
   docs/images/
     plugin_screenshot.png
   examples/

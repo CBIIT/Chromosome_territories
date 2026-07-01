@@ -288,6 +288,7 @@ class AnalysisOutputs:
     output_dir: Path
     plot_dir: Path
     per_nucleus_csv: Path
+    per_object_csv: Path
     population_summary_csv: Path
     nuclei_labels_tif: Path
     p_mask_tif: Path
@@ -2006,6 +2007,157 @@ def analyze_one_nucleus_from_subvolume(
     return out
 
 
+def _scene_value(value: str | Path | None) -> str:
+    """Return a stable string for optional image/scene metadata fields."""
+    if value is None:
+        return ""
+    text = str(value)
+    return text if text is not None else ""
+
+
+def build_per_object_measurements(
+    nuclei_labels: np.ndarray,
+    p_union: np.ndarray,
+    q_union: np.ndarray,
+    spacing_zyx: SpacingZYX,
+    params: AnalysisParameters,
+    source_image_path: str | Path | None = None,
+    scene_name: str | None = None,
+    data_shape_czyx: Sequence[int] | None = None,
+) -> pd.DataFrame:
+    """Create a one-row-per-final-FISH-object measurement table.
+
+    The public per-nucleus table summarizes all retained P compartments as one
+    P-arm union and all retained Q compartments as one Q-arm union inside each
+    nucleus. This object-level table keeps the next level of detail: each row is
+    one connected 3D component in the final accepted P or Q mask. Therefore the
+    number of rows equals the total number of final P-arm components plus the
+    total number of final Q-arm components across all analyzed nuclei.
+
+    Object masks are measured with the same physical spacing-aware shape helper
+    used for the per-nucleus union masks. Parent image, scene, and nucleus/cell
+    identifiers are included so the table can be aggregated back to per-nucleus
+    or per-scene summaries later.
+    """
+    nuclei_labels = np.asarray(nuclei_labels, dtype=np.int32)
+    p_union = np.asarray(p_union, dtype=bool)
+    q_union = np.asarray(q_union, dtype=bool)
+    if nuclei_labels.shape != p_union.shape or nuclei_labels.shape != q_union.shape:
+        raise ValueError(
+            f"Shape mismatch for object table: nuclei={nuclei_labels.shape}, "
+            f"P={p_union.shape}, Q={q_union.shape}."
+        )
+
+    source_path = _scene_value(source_image_path)
+    source_name = Path(source_path).name if source_path else ""
+    scene_text = _scene_value(scene_name)
+    shape_vals = list(map(int, data_shape_czyx)) if data_shape_czyx is not None else []
+    shape_c = shape_vals[0] if len(shape_vals) > 0 else np.nan
+    shape_z = shape_vals[1] if len(shape_vals) > 1 else nuclei_labels.shape[0]
+    shape_y = shape_vals[2] if len(shape_vals) > 2 else nuclei_labels.shape[1]
+    shape_x = shape_vals[3] if len(shape_vals) > 3 else nuclei_labels.shape[2]
+
+    rows: list[dict] = []
+    global_object_id = 0
+    voxel_um3 = float(np.prod(spacing_zyx))
+    objects = ndi.find_objects(nuclei_labels)
+
+    for label_id in _label_ids(nuclei_labels, limit_nuclei=params.limit_nuclei):
+        idx = int(label_id) - 1
+        if idx < 0 or idx >= len(objects):
+            continue
+        slc = objects[idx]
+        if slc is None:
+            continue
+        offset = (int(slc[0].start), int(slc[1].start), int(slc[2].start))
+        nucleus_mask = nuclei_labels[slc] == int(label_id)
+        if not np.any(nucleus_mask):
+            continue
+        nucleus_volume_um3 = float(nucleus_mask.sum()) * voxel_um3
+        nucleus_centroid = centroid_um(nucleus_mask, spacing_zyx, offset_zyx=offset)
+
+        for arm_key, arm_label, arm_mask_global in (
+            ("p", "P", p_union),
+            ("q", "Q", q_union),
+        ):
+            arm_mask = np.asarray(arm_mask_global[slc], dtype=bool) & nucleus_mask
+            comp_labels, n_components = ndi.label(arm_mask)
+            if n_components <= 0:
+                continue
+            for object_index in range(1, int(n_components) + 1):
+                object_mask = comp_labels == int(object_index)
+                if not np.any(object_mask):
+                    continue
+                global_object_id += 1
+                object_centroid = centroid_um(object_mask, spacing_zyx, offset_zyx=offset)
+                object_shape = _shape_metrics(object_mask, spacing_zyx, "object_shape")
+                object_radial = _radial_position_metrics(object_mask, nucleus_mask, spacing_zyx, "object")
+                object_volume_um3 = float(object_mask.sum()) * voxel_um3
+                row = {
+                    "source_image_path": source_path,
+                    "source_image_name": source_name,
+                    "scene_name": scene_text,
+                    "data_shape_c": shape_c,
+                    "data_shape_z": shape_z,
+                    "data_shape_y": shape_y,
+                    "data_shape_x": shape_x,
+                    "nucleus_id": int(label_id),
+                    "cell_id": int(label_id),
+                    "arm": arm_label,
+                    "object_type": f"{arm_label}_arm_fish_signal",
+                    "object_global_id": int(global_object_id),
+                    "object_index_within_nucleus_arm": int(object_index),
+                    "object_unique_id": f"nucleus_{int(label_id)}_{arm_key}_object_{int(object_index)}",
+                    "parent_nucleus_volume_um3": nucleus_volume_um3,
+                    "parent_nucleus_centroid_z_um": nucleus_centroid[0],
+                    "parent_nucleus_centroid_y_um": nucleus_centroid[1],
+                    "parent_nucleus_centroid_x_um": nucleus_centroid[2],
+                    "object_voxel_count": int(object_mask.sum()),
+                    "object_volume_um3": object_volume_um3,
+                    "object_fraction_of_nucleus": object_volume_um3 / nucleus_volume_um3 if nucleus_volume_um3 > EPS else float("nan"),
+                    "object_centroid_z_um": object_centroid[0],
+                    "object_centroid_y_um": object_centroid[1],
+                    "object_centroid_x_um": object_centroid[2],
+                }
+                row.update(object_shape)
+                row.update(object_radial)
+                rows.append(row)
+
+    if rows:
+        return pd.DataFrame(rows)
+
+    empty_columns = [
+        "source_image_path",
+        "source_image_name",
+        "scene_name",
+        "data_shape_c",
+        "data_shape_z",
+        "data_shape_y",
+        "data_shape_x",
+        "nucleus_id",
+        "cell_id",
+        "arm",
+        "object_type",
+        "object_global_id",
+        "object_index_within_nucleus_arm",
+        "object_unique_id",
+        "parent_nucleus_volume_um3",
+        "parent_nucleus_centroid_z_um",
+        "parent_nucleus_centroid_y_um",
+        "parent_nucleus_centroid_x_um",
+        "object_voxel_count",
+        "object_volume_um3",
+        "object_fraction_of_nucleus",
+        "object_centroid_z_um",
+        "object_centroid_y_um",
+        "object_centroid_x_um",
+    ]
+    empty_mask = np.zeros((1, 1, 1), dtype=bool)
+    empty_columns.extend(_shape_metrics(empty_mask, spacing_zyx, "object_shape").keys())
+    empty_columns.extend(_radial_position_metrics(empty_mask, np.ones((1, 1, 1), dtype=bool), spacing_zyx, "object").keys())
+    return pd.DataFrame(columns=empty_columns)
+
+
 def _label_ids(nuclei_labels: np.ndarray, limit_nuclei: int = 0) -> list[int]:
     ids = [int(x) for x in np.unique(nuclei_labels) if int(x) > 0]
     if limit_nuclei and limit_nuclei > 0:
@@ -2259,6 +2411,19 @@ def run_full_analysis(
     per_nucleus_csv = output_dir / "series7_chrX_arm_measurements_per_nucleus.csv"
     df.to_csv(per_nucleus_csv, index=False)
 
+    object_df = build_per_object_measurements(
+        nuclei_labels,
+        p_union,
+        q_union,
+        spacing_zyx,
+        params,
+        source_image_path=source_image_path,
+        scene_name=scene_name,
+        data_shape_czyx=data_czyx.shape,
+    )
+    per_object_csv = output_dir / "series7_chrX_arm_measurements_per_object.csv"
+    object_df.to_csv(per_object_csv, index=False)
+
     summary = make_population_summary(df)
     population_summary_csv = output_dir / "series7_chrX_arm_measurements_population_summary.csv"
     pd.DataFrame([summary]).to_csv(population_summary_csv, index=False)
@@ -2305,7 +2470,7 @@ def run_full_analysis(
     # parameter set can be reloaded later from the GUI.
     run_configuration = {
         "plugin": "napari-pq-arm-analyzer",
-        "plugin_version": "0.3.5",
+        "plugin_version": "0.3.8",
         "source_image_path": str(source_image_path) if source_image_path is not None else None,
         "scene_name": scene_name,
         "spacing_zyx_um": list(map(float, spacing_zyx)),
@@ -2323,6 +2488,7 @@ def run_full_analysis(
         output_dir=output_dir,
         plot_dir=plot_dir,
         per_nucleus_csv=per_nucleus_csv,
+        per_object_csv=per_object_csv,
         population_summary_csv=population_summary_csv,
         nuclei_labels_tif=nuclei_labels_tif,
         p_mask_tif=p_mask_tif,

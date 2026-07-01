@@ -54,7 +54,7 @@ from .analysis import (
 )
 from .image_io import SUPPORTED_IMAGE_FILTER
 
-PLUGIN_VERSION = "0.3.5"
+PLUGIN_VERSION = "0.3.8"
 
 
 def _token(text: str) -> str:
@@ -1207,7 +1207,8 @@ class PQArmAnalyzerWidget(QWidget):
     def _on_analysis_returned(self, outputs: AnalysisOutputs) -> None:
         self._set_main_busy(False)
         self.append_status(f"Analysis complete: {outputs.n_nuclei} nuclei measured.")
-        self.append_status(f"CSV: {outputs.per_nucleus_csv}")
+        self.append_status(f"Per-nucleus CSV: {outputs.per_nucleus_csv}")
+        self.append_status(f"Per-object CSV: {outputs.per_object_csv}")
         self.append_status(f"Plots: {outputs.plot_dir}")
         try:
             from tifffile import imread

@@ -6,7 +6,7 @@
 
 """napari plugin for P/Q arm segmentation and measurement."""
 
-__version__ = "0.3.7"
+__version__ = "0.3.8"
 
 try:
     from ._widget import PQArmAnalyzerWidget, make_widget

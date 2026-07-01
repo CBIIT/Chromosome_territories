@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.8
+
+- Added `series7_chrX_arm_measurements_per_object.csv`, a public one-row-per-final-P/Q-FISH-object table.
+- Added source image, scene, nucleus/cell, arm, object index, centroid, radial, volume, fraction, and per-object 3D shape measurements.
+- Updated documentation to describe the new object-level output while preserving existing per-nucleus outputs.
+
 ## v0.3.7
 
 - Added collaborator-requested per-nucleus FISH signal-count measurements to the public results table: `p_fish_signal_count` and `q_fish_signal_count`.

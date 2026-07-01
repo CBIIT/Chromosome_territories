@@ -1,7 +1,7 @@
 include README.md
 include LICENSE
 recursive-include src/napari_pq_arm_analyzer *.yaml
-recursive-include docs/manual *.docx
+recursive-include docs/manual *.docx *.pptx
 recursive-include docs/images *.png *.md
 
 include CHANGELOG.md
